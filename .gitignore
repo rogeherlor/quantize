@@ -1,0 +1,8 @@
+/__pycache__
+*__pycache__*
+/.vscode
+/.ipynb_checkpoints
+
+/data
+/model_zoo
+/output

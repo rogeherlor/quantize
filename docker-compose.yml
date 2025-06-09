@@ -1,0 +1,40 @@
+services:
+  quantize-gpu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: quantize-gpu
+    privileged: true
+    profiles:
+      - quantize-gpu
+    runtime: nvidia # Comment if only CPU
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    volumes:
+      - ./:/workspace
+    stdin_open: true
+    tty: true
+    command: /bin/bash -c "tail -f /dev/null"
+    network_mode: "host"
+    shm_size: 8g
+  
+  quantize-cpu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: quantize-cpu
+    privileged: true
+    profiles:
+      - quantize-cpu
+    # runtime: nvidia # Comment if only CPU
+    volumes:
+      - ./:/workspace
+    stdin_open: true
+    tty: true
+    command: /bin/bash -c "tail -f /dev/null"
+    network_mode: "host"
+    shm_size: 8g
+
+# docker-compose --profile quantize-gpu up --build -d
+# docker-compose --profile quantize-cpu up --build -d
