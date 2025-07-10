@@ -32,7 +32,7 @@ x_grad_scale_mode: null
 # Qparms Optimizer settings
 different_optimizer_mode: True
 step_size_optimizer: AdamW
-pre_trained: False
+pre_trained: True
 evaluation_mode: True
 write_log: True
 ddp: False

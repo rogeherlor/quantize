@@ -114,7 +114,7 @@ def run_one_epoch(net, dataloader, optimizers, criterion, epoch, mode, best_acc,
         net.eval()
         torch.set_grad_enabled(False)
 
-    total_loss        = 0.0
+    total_loss = 0.0
     total_loss_dict = {}
     total_num_sample  = 0
     total_num_correct = 0
