@@ -12,7 +12,7 @@ lr_scheduler: LinearWarmupCosineAnnealing
 warmup_epochs: 10
 warmup_lr: 0.00001
 
-nworkers: 4
+nworkers: 10
 # Quantizer Settings
 w_first_last_quantizer: null
 x_first_last_quantizer: null

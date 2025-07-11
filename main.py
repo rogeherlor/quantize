@@ -13,6 +13,7 @@ from src.quantizer.uniform import *
 from src.quantizer.nonuniform import *
 from src.initializer import *
 from src.run_qat import run_qat
+from src.run_stats import run_stats
 
 if __name__ == '__main__':
     with open('./config/imagenet/LSQ_base.yaml') as file:
@@ -99,7 +100,12 @@ if __name__ == '__main__':
         logger.info("QAT finished")
     elif args.mode == 'PTQ':
         logger.info("Start PTQ at the following setting")
-    
+        logger.warning("PTQ is not implemented yet")
+    elif args.mode == 'STATS':
+        logger.info("Start STATS at the following setting")
+        run_stats(config)
+        logger.info("STATS finished")
+
     torch.cuda.synchronize() if torch.cuda.is_available() else None
     end = time.time()
     logger.info(f"Total time: {end - start:.3f} seconds")
