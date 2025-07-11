@@ -124,7 +124,10 @@ def run_one_epoch(net, dataloader, optimizers, criterion, epoch, mode, best_acc,
         pbar.set_description(f"Epoch[{epoch}/{args.nepochs}]({mode})")
 
         # loop for each epoch
-        for i, (inputs, labels) in enumerate(dataloader[mode]):
+        # for i, (inputs, labels) in enumerate(dataloader[mode]):
+        inputs, labels = next(iter(dataloader[mode]))
+        inputs, labels = inputs.to(args.device), labels.to(args.device)
+        if True:
             loss_dict = {}
             inputs, labels = inputs.to(args.device), labels.to(args.device)
             
@@ -268,6 +271,9 @@ def run_train(rank, args, net):
             writer.add_scalar("top1_accuracy/2.val", val_accuracy, epoch)
             writer.add_scalar("top5_accuracy/1.train", train_top5_accuracy, epoch)
             writer.add_scalar("top5_accuracy/2.val", val_top5_accuracy, epoch)
+            for name, param in net.named_parameters():
+                tb_name = name.rsplit('.', 1)[0] + '/' + name.rsplit('.', 1)[1] if '.' in name else name
+                writer.add_histogram(tb_name, param, epoch)
 
             if args.save_mode == "all_checkpoints":
                 save_ckp(net, scheduler, optimizer, best_acc, epoch, val_accuracy, args.ddp, filename=os.path.join(save_path, 'ckpt_{}epoch.pth'.format(epoch)))
