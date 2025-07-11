@@ -21,11 +21,25 @@ from src.utils import *
 from src.scheduler_optimizer_class import scheduler_optimizer_class
 from src.make_ex_name import *
 
+def log_detailed_params(writer, net, prefix=''):
+    for name, param in net.named_parameters():
+        tb_name = name.rsplit('.', 1)[0] + '/' + name.rsplit('.', 1)[1] if '.' in name else name
+        
+        writer.add_histogram(f'{prefix}{tb_name}', param.data, bins='auto', max_bins=65536)
+
+        if param.grad is not None:
+            writer.add_histogram(f'{prefix}{tb_name}.gradients', param.grad, bins='auto', max_bins=65536)
+        
+        writer.add_scalar(f'{prefix}{tb_name}.mean', param.mean().item(), 0)
+        writer.add_scalar(f'{prefix}{tb_name}.std', param.std().item(), 0)
+        writer.add_scalar(f'{prefix}{tb_name}.max', param.max().item(), 0)
+        writer.add_scalar(f'{prefix}{tb_name}.min', param.min().item(), 0)
+
 def run_test(args):
     logger.info(f"==> Preparing testing for {args.dataset_name}..")
     pin_memory = True if args.device == 'cuda' else False
     dataloader = setup_dataloader(args.dataset_name, args.batch_size, args.nworkers, pin_memory = pin_memory, DDP_mode = False, model = args.model)
-    net = create_model(args)        
+    net = create_model(args)
     assert net != None
     
     net = net.to(args.device)
@@ -41,6 +55,15 @@ def run_test(args):
         
     val_accuracy, val_top5_accuracy,  val_loss, best_acc, val_loss_dict   = run_one_epoch(net, dataloader, None, criterion_val, 0, "val", 0, args)
     logger.info(f'[FP32 model] val_Loss: {val_loss_dict["task_loss"].item():.5f}, val_top1_Acc: {val_accuracy:.5f}, val_top5_Acc: {val_top5_accuracy:.5f}')
+    
+    if args.write_log:
+        args.ex_name = make_ex_name(args)
+        save_path = os.path.join(args.save_path, "test", args.dataset_name, args.ex_name)
+        writer = SummaryWriter(os.path.join(save_path, 'tf_log'))
+        writer.add_scalar("test-top1_accuracy/2.val", val_accuracy, 0)
+        writer.add_scalar("test-top5_accuracy/2.val", val_top5_accuracy, 0)
+        writer.add_scalar("test-loss/3.val_cross_entropy", val_loss_dict["task_loss"], 0)
+        log_detailed_params(writer, net, prefix='test-')
     
 def run_load_model(args):
     pin_memory = True if args.device == 'cuda' else False
@@ -124,10 +147,7 @@ def run_one_epoch(net, dataloader, optimizers, criterion, epoch, mode, best_acc,
         pbar.set_description(f"Epoch[{epoch}/{args.nepochs}]({mode})")
 
         # loop for each epoch
-        # for i, (inputs, labels) in enumerate(dataloader[mode]):
-        inputs, labels = next(iter(dataloader[mode]))
-        inputs, labels = inputs.to(args.device), labels.to(args.device)
-        if True:
+        for i, (inputs, labels) in enumerate(dataloader[mode]):
             loss_dict = {}
             inputs, labels = inputs.to(args.device), labels.to(args.device)
             
@@ -271,9 +291,7 @@ def run_train(rank, args, net):
             writer.add_scalar("top1_accuracy/2.val", val_accuracy, epoch)
             writer.add_scalar("top5_accuracy/1.train", train_top5_accuracy, epoch)
             writer.add_scalar("top5_accuracy/2.val", val_top5_accuracy, epoch)
-            for name, param in net.named_parameters():
-                tb_name = name.rsplit('.', 1)[0] + '/' + name.rsplit('.', 1)[1] if '.' in name else name
-                writer.add_histogram(tb_name, param, epoch)
+            log_detailed_params(writer, net)
 
             if args.save_mode == "all_checkpoints":
                 save_ckp(net, scheduler, optimizer, best_acc, epoch, val_accuracy, args.ddp, filename=os.path.join(save_path, 'ckpt_{}epoch.pth'.format(epoch)))

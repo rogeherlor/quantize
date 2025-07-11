@@ -19,7 +19,7 @@ def imagenet_dataloaders(batch_size, num_workers, pin_memory, DDP_mode = True, m
     
     logger.warning("Not definitive imagenet train/test data")
     traindir = './data/imagenet/training'
-    valdir = './data/imagenet/training' 
+    valdir = './data/imagenet/validation' 
     
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 

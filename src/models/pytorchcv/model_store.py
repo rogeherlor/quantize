@@ -631,10 +631,9 @@ def get_model_file(model_name,
     file_path
         Path to the requested pretrained model file.
     """
-    print("get_model_file")
+    logging.info("Get_model_file")
     error, sha1_hash, repo_release_tag = get_model_name_suffix_data(model_name)
     short_sha1 = sha1_hash[:8]
-    print("get_model_file")
     file_name = "{name}-{error}-{short_sha1}.pth".format(
         name=model_name,
         error=error,
@@ -653,7 +652,7 @@ def get_model_file(model_name,
     if not os.path.exists(local_model_store_dir_path):
         os.makedirs(local_model_store_dir_path)
 
-    print("get_model_file")
+    logging.info("Get_model_file")
     zip_file_path = file_path + ".zip"
     _download(
         url="{repo_url}/releases/download/{repo_release_tag}/{file_name}.zip".format(
@@ -667,6 +666,7 @@ def get_model_file(model_name,
     os.remove(zip_file_path)
 
     if _check_sha1(file_path, sha1_hash):
+        logging.info("Got_model_file")
         return file_path
     else:
         raise ValueError("Downloaded file has different hash. Please try again.")
