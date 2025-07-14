@@ -46,7 +46,8 @@ def run_test(args):
 
     if args.init_from and os.path.isfile(args.init_from):
         logger.info('==> Loading from checkpoint: ', args.init_from)
-        net = load_from_FP32_model(args.init_from, net)
+        net = run_load_model(args)
+        # net = load_from_FP32_model(args.init_from, net)
 
     cudnn.benchmark = True if args.device == 'cuda' else False
         
@@ -69,16 +70,17 @@ def run_load_model(args):
     pin_memory = True if args.device == 'cuda' else False
     dataloader = setup_dataloader(args.dataset_name, args.batch_size, args.nworkers, pin_memory = pin_memory, DDP_mode = args.ddp, model = args.model)
     net = create_model(args)
+    net = net.to(args.device)
     assert net != None
 
     logger.info("Saving original model state dict..")
     torch.save(net.state_dict(), f"./model_zoo/pytorchcv/{args.model}_{args.dataset_name}_original.pth")
 
-    logger.info("Exporting original model to ONNX format..")
-    onnx_dataloader = setup_dataloader(args.dataset_name, args.batch_size, nworkers=0, pin_memory = False, DDP_mode=False, model=args.model)
-    dummy_input, _ = next(iter(onnx_dataloader["train"]))
-    dummy_input = dummy_input.to(args.device)
-    torch.onnx.export(net, dummy_input, f"./model_zoo/onnx/{args.model}_{args.dataset_name}_original.onnx")
+    # logger.info("Exporting original model to ONNX format..")
+    # onnx_dataloader = setup_dataloader(args.dataset_name, args.batch_size, nworkers=0, pin_memory = False, DDP_mode=False, model=args.model)
+    # dummy_input, _ = next(iter(onnx_dataloader["train"]))
+    # dummy_input = dummy_input.to(args.device)
+    # torch.onnx.export(net, dummy_input, f"./model_zoo/onnx/{args.model}_{args.dataset_name}_original.onnx")
 
     logger.debug(net)
 
@@ -114,18 +116,18 @@ def run_load_model(args):
     }
 
     net = replace_module(net, replacement_dict=replacement_dict, exception_dict=exception_dict, arch=args.model)
-    net = net.to(args.device)
-
     logger.debug(net)
 
     logger.info(f"==> Performing action: {args.action}")
     if args.action == 'load':
         if args.init_from and os.path.isfile(args.init_from):
-            print('==> Initializing from checkpoint: ', args.init_from)
+            logger.info(f'==> Initializing from checkpoint: {args.init_from}')
             net = load_from_FP32_model(args.init_from, net)
             stepsize_init(net, dataloader["train"], args.device, args.init_num)
         else:
-            logger.warning("No checkpoint file is provided !!!")
+            logger.warning(f"No valid checkpoint file is provided !!! {args.init_from}")
+    
+    net = net.to(args.device)
 
     return net
 

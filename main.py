@@ -83,6 +83,8 @@ if __name__ == '__main__':
             config.w_step_size_wd = config.weight_decay
     elif args.mode == 'PTQ':
         pass
+    elif args.mode == 'STATS':
+        config.init_from = args.init_from if args.init_from != None else None
 
     # Execution
     torch.cuda.synchronize() if torch.cuda.is_available() else None
