@@ -43,48 +43,44 @@ if __name__ == '__main__':
     # Config setup
     args = parser.parse_args()
     config.num_bits = args.num_bits
-    if args.mode == 'QAT':
-        QuantizerDict ={
-            "MinMax_quantizer": MinMax_quantizer,
-            "LSQ_quantizer": LSQ_quantizer,
-            "LCQ_quantizer": LCQ_quantizer,
-            "APoT_quantizer": APoT_quantizer,
-            "Positive_nuLSQ_quantizer": Positive_nuLSQ_quantizer,
-            "Symmetric_nuLSQ_quantizer": Symmetric_nuLSQ_quantizer,
-            "FP": None
-        }
-        InitializerDict ={
-            "NMSE_initializer": NMSE_initializer,
-            "LSQ_initializer": LSQ_initializer,
-            "Const_initializer": Const_initializer,
-        }
-        config.lr = args.lr
-        config.x_step_size_lr = round(args.coeff_qparm_lr*config.lr, ndigits=5)
-        config.w_step_size_lr = round(args.coeff_qparm_lr*config.lr, ndigits=5)
-        config.weight_decay = args.weight_decay
-        config.x_step_size_wd = args.qparm_wd
-        config.w_step_size_wd = args.qparm_wd
-        config.w_first_last_quantizer = MinMax_quantizer
-        config.x_first_last_quantizer = MinMax_quantizer
-        config.x_quantizer = QuantizerDict[args.x_quantizer]
-        config.w_quantizer = QuantizerDict[args.w_quantizer]
-        config.x_initializer = InitializerDict[args.initializer]
-        config.w_initializer = InitializerDict[args.initializer]
-        config.train_id = args.train_id
-        config.first_run = args.first_run
-        config.init_from = args.init_from if args.init_from != None else None
+    
+    QuantizerDict ={
+        "MinMax_quantizer": MinMax_quantizer,
+        "LSQ_quantizer": LSQ_quantizer,
+        "LCQ_quantizer": LCQ_quantizer,
+        "APoT_quantizer": APoT_quantizer,
+        "Positive_nuLSQ_quantizer": Positive_nuLSQ_quantizer,
+        "Symmetric_nuLSQ_quantizer": Symmetric_nuLSQ_quantizer,
+        "FP": None
+    }
+    InitializerDict ={
+        "NMSE_initializer": NMSE_initializer,
+        "LSQ_initializer": LSQ_initializer,
+        "Const_initializer": Const_initializer,
+    }
+    config.lr = args.lr
+    config.x_step_size_lr = round(args.coeff_qparm_lr*config.lr, ndigits=5)
+    config.w_step_size_lr = round(args.coeff_qparm_lr*config.lr, ndigits=5)
+    config.weight_decay = args.weight_decay
+    config.x_step_size_wd = args.qparm_wd
+    config.w_step_size_wd = args.qparm_wd
+    config.w_first_last_quantizer = MinMax_quantizer
+    config.x_first_last_quantizer = MinMax_quantizer
+    config.x_quantizer = QuantizerDict[args.x_quantizer]
+    config.w_quantizer = QuantizerDict[args.w_quantizer]
+    config.x_initializer = InitializerDict[args.initializer]
+    config.w_initializer = InitializerDict[args.initializer]
+    config.train_id = args.train_id
+    config.first_run = args.first_run
+    config.init_from = args.init_from if args.init_from != None else None
 
-        if config.different_optimizer_mode == False:
-            logger.info("reset Qparm hyper parameters to be same as other parameters' ones")
-            config.step_size_optimizer = config.optimizer
-            config.x_step_size_lr = config.lr
-            config.w_step_size_lr = config.lr
-            config.x_step_size_wd = config.weight_decay
-            config.w_step_size_wd = config.weight_decay
-    elif args.mode == 'PTQ':
-        pass
-    elif args.mode == 'STATS':
-        config.init_from = args.init_from if args.init_from != None else None
+    if config.different_optimizer_mode == False:
+        logger.info("reset Qparm hyper parameters to be same as other parameters' ones")
+        config.step_size_optimizer = config.optimizer
+        config.x_step_size_lr = config.lr
+        config.w_step_size_lr = config.lr
+        config.x_step_size_wd = config.weight_decay
+        config.w_step_size_wd = config.weight_decay
 
     # Execution
     torch.cuda.synchronize() if torch.cuda.is_available() else None

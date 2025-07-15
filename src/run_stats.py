@@ -19,18 +19,30 @@ def activation_stats(net, output):
 
 def histogram(net):
     logger.info("Generating histogram of weights and activations...")
+    param_dict = dict(net.named_parameters())
+    BLUE = "\033[94m"
+    ORANGE = "\033[38;5;208m"
+    RESET = "\033[0m"
     for name, param in net.named_parameters():
-        logger.debug(f"Layer name: {name}")
-        if name.endswith('weight') or name.endswith('bias') or name.endswith('w_scale') or name.endswith('x_scale'):
-            logger.debug(f"{name}: {param.data.shape}")
-            if param.requires_grad:
-                logger.debug(f"  - requires_grad: {param.requires_grad}")
-            else:
-                logger.debug(f"  - requires_grad: False")
+        if name.endswith('weight'):
+            logger.debug(f"{BLUE}{name} (weight): {param.data.shape}")
             logger.debug(f"  - min: {param.data.min().item()}, max: {param.data.max().item()}")
             logger.debug(f"  - mean: {param.data.mean().item()}, std: {param.data.std().item()}")
-            logger.debug(f"  - histogram: {param.data.histogram()}")
-            logger.debug(f"  - first values: {param.data.flatten()[:20]}...") # * x_scale o w_scale
+            logger.debug(f"  - first values: {param.data.flatten()[:20]}...")
+            scale_name = name[:-6] + 'w_scale'
+            scale = param_dict.get(scale_name, None)
+            if scale is not None:
+                try:
+                    divided = (param.data.flatten()[:20] / scale.data).cpu()
+                    logger.debug(f"  - w_scale: {scale.data}")
+                    logger.debug(f"  - first values / w_scale: {divided}...{RESET}")
+                except Exception as e:
+                    logger.debug(f"  - Could not divide by w_scale: {e}{RESET}")
+        elif name.endswith('bias'):
+            logger.debug(f"{ORANGE}{name} (bias): {param.data.shape}")
+            logger.debug(f"  - min: {param.data.min().item()}, max: {param.data.max().item()}")
+            logger.debug(f"  - mean: {param.data.mean().item()}, std: {param.data.std().item()}")
+            logger.debug(f"  - first values: {param.data.flatten()[:20]}...{RESET}")
 
 def run_stats(args):
     logger.debug("Run STATS arguments:\n", args)

@@ -82,8 +82,6 @@ def run_load_model(args):
     # dummy_input = dummy_input.to(args.device)
     # torch.onnx.export(net, dummy_input, f"./model_zoo/onnx/{args.model}_{args.dataset_name}_original.onnx")
 
-    logger.debug(net)
-
     logger.info("==> Replacing model parameters..")
     replacement_dict = {
         nn.Conv2d : partial(Q.QConv2d, \
