@@ -21,20 +21,6 @@ from src.utils import *
 from src.scheduler_optimizer_class import scheduler_optimizer_class
 from src.make_ex_name import *
 
-def log_detailed_params(writer, net, prefix=''):
-    for name, param in net.named_parameters():
-        tb_name = name.rsplit('.', 1)[0] + '/' + name.rsplit('.', 1)[1] if '.' in name else name
-        
-        writer.add_histogram(f'{prefix}{tb_name}', param.data, bins='auto', max_bins=65536)
-
-        if param.grad is not None:
-            writer.add_histogram(f'{prefix}{tb_name}.gradients', param.grad, bins='auto', max_bins=65536)
-        
-        writer.add_scalar(f'{prefix}{tb_name}.mean', param.mean().item(), 0)
-        writer.add_scalar(f'{prefix}{tb_name}.std', param.std().item(), 0)
-        writer.add_scalar(f'{prefix}{tb_name}.max', param.max().item(), 0)
-        writer.add_scalar(f'{prefix}{tb_name}.min', param.min().item(), 0)
-
 def run_test(args):
     logger.info(f"==> Preparing testing for {args.dataset_name}..")
     pin_memory = True if args.device == 'cuda' else False
@@ -60,10 +46,11 @@ def run_test(args):
     if args.write_log:
         args.ex_name = make_ex_name(args)
         save_path = os.path.join(args.save_path, "test", args.dataset_name, args.ex_name)
-        writer = SummaryWriter(os.path.join(save_path, 'tf_log'))
-        writer.add_scalar("test-top1_accuracy/2.val", val_accuracy, 0)
-        writer.add_scalar("test-top5_accuracy/2.val", val_top5_accuracy, 0)
-        writer.add_scalar("test-loss/3.val_cross_entropy", val_loss_dict["task_loss"], 0)
+        os.makedirs(save_path, exist_ok=True)
+        writer = SummaryWriter(save_path)
+        writer.add_scalar("top1_accuracy/2.val", val_accuracy, 0)
+        writer.add_scalar("top5_accuracy/2.val", val_top5_accuracy, 0)
+        writer.add_scalar("loss/3.val_cross_entropy", val_loss_dict["task_loss"], 0)
         log_detailed_params(writer, net, prefix='test-')
     
 def run_load_model(args):
@@ -81,8 +68,6 @@ def run_load_model(args):
     # dummy_input, _ = next(iter(onnx_dataloader["train"]))
     # dummy_input = dummy_input.to(args.device)
     # torch.onnx.export(net, dummy_input, f"./model_zoo/onnx/{args.model}_{args.dataset_name}_original.onnx")
-
-    logger.debug(net)
 
     logger.info("==> Replacing model parameters..")
     replacement_dict = {
@@ -123,6 +108,7 @@ def run_load_model(args):
         if args.init_from and os.path.isfile(args.init_from):
             logger.info(f'==> Initializing from checkpoint: {args.init_from}')
             net = load_from_FP32_model(args.init_from, net)
+            net.to(args.device)
             stepsize_init(net, dataloader["train"], args.device, args.init_num)
         else:
             logger.warning(f"No valid checkpoint file is provided !!! {args.init_from}")
@@ -210,13 +196,12 @@ def run_train(rank, args, net):
     
     net = net.to(args.device)
 
-    args.ex_name = make_ex_name(args)
-
-    save_path = os.path.join(args.save_path, args.dataset_name, args.ex_name)
     if args.write_log:
+        args.ex_name = make_ex_name(args)
+        save_path = os.path.join(args.save_path, "train", args.dataset_name, args.ex_name)
         os.makedirs(save_path, exist_ok=True)
         write_experiment_params(args, os.path.join(save_path, args.model+'.txt'))
-        writer = SummaryWriter(os.path.join(save_path, 'tf_log'))
+        writer = SummaryWriter(save_path)
 
         if rank == 0:
             if args.first_run:

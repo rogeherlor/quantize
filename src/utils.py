@@ -275,3 +275,18 @@ class dotdict(dict):
     __setattr__ = dict.__setitem__
     __delattr__ = dict.__delitem__
 
+########################################################
+
+def log_detailed_params(writer, net, prefix=''):
+    for name, param in net.named_parameters():
+        tb_name = name.rsplit('.', 1)[0] + '/' + name.rsplit('.', 1)[1] if '.' in name else name
+        
+        writer.add_histogram(f'{prefix}{tb_name}', param.data, bins='auto', max_bins=65536)
+
+        if param.grad is not None:
+            writer.add_histogram(f'{prefix}{tb_name}.gradients', param.grad, bins='auto', max_bins=65536)
+        
+        writer.add_scalar(f'{prefix}{tb_name}.mean', param.mean().item(), 0)
+        writer.add_scalar(f'{prefix}{tb_name}.std', param.std().item(), 0)
+        writer.add_scalar(f'{prefix}{tb_name}.max', param.max().item(), 0)
+        writer.add_scalar(f'{prefix}{tb_name}.min', param.min().item(), 0)

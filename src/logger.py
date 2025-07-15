@@ -3,6 +3,7 @@ import logging
 
 logger = logging.getLogger("src")
 logger.setLevel(logging.DEBUG)
+logger.propagate = False
 
 if not logger.handlers:
     stream_handler = logging.StreamHandler()

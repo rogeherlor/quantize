@@ -1,7 +1,7 @@
 action: load # resume
 train_id: null
 dataset_name: imagenet
-model: pytorchcv_preresnet18 # pytorchcv_preresnet18 # pytorchcv_vitb16
+model: pytorchcv_vitb16 # pytorchcv_preresnet18 # pytorchcv_vitb16
 nepochs: 2 # 300
 batch_size: 128
 optimizer: SGD
@@ -32,8 +32,8 @@ x_grad_scale_mode: null
 # Qparms Optimizer settings
 different_optimizer_mode: True
 step_size_optimizer: AdamW
-pre_trained: False
-evaluation_mode: False
+pre_trained: True
+evaluation_mode: True
 write_log: True
 ddp: False
 invisible_pgb: False
