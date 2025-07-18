@@ -12,3 +12,4 @@ Obtener sus resultados del paper (train, ver tipo y valor de los pesos quantizad
 Añadir quantizacion Batch2D
 Añadir ViT
 Añadir quantizacion attention
+Igual modulo dequant para poder obtener mas facilmente los valores quantizados

@@ -28,6 +28,8 @@ def histogram(net):
             logger.debug(f"{BLUE}{name} (weight): {param.data.shape}")
             logger.debug(f"  - min: {param.data.min().item()}, max: {param.data.max().item()}")
             logger.debug(f"  - mean: {param.data.mean().item()}, std: {param.data.std().item()}")
+            import numpy as np
+            np.set_printoptions(precision=20, suppress=False)
             logger.debug(f"  - first values: {param.data.flatten()[:20]}...")
             scale_name = name[:-6] + 'w_scale'
             scale = param_dict.get(scale_name, None)

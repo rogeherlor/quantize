@@ -121,6 +121,7 @@ def run_load_model(args):
         if args.init_from and os.path.isfile(args.init_from):
             logger.info(f'==> Initializing from checkpoint: {args.init_from}')
             net = load_from_FP32_model(args.init_from, net)
+            net.to(args.device)
             stepsize_init(net, dataloader["train"], args.device, args.init_num)
         else:
             logger.warning(f"No valid checkpoint file is provided !!! {args.init_from}")
