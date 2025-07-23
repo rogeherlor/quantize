@@ -254,7 +254,7 @@ def run_train(rank, args, net):
     all_optimizers = Multiple_optimizer_scheduler(optimizer_dict)
     all_schedulers = Multiple_optimizer_scheduler(scheduler_dict)
 
-    logger.info("Inference with original model before training..")
+    logger.info("Inference before training..")
     val_accuracy, val_top5_accuracy,  total_val_loss, best_acc, val_loss_dict = run_one_epoch(net, dataloader, all_optimizers, criterion, 0, "val", best_acc, args)
     if rank == 0:
         logger.info(f'Before learning val_Loss: {val_loss_dict["task_loss"].item():.4f}, val_Acc: {val_accuracy:.4f}')

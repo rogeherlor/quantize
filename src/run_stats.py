@@ -86,7 +86,6 @@ def plot_histogram(data, title, bins=256):
     return fig
 
 def histogram(net, writer, step=0):
-    logger.info("Generating histogram of weights, biases, scales, and activations...")
     param_dict = dict(net.named_parameters())
     buffer_dict = dict(net.named_buffers())
 
@@ -113,7 +112,6 @@ def histogram(net, writer, step=0):
             log_tensor(writer, tag_prefix, suffix, data, step)
 
     logger.debug("Logging buffers...")
-    y_buffers = {}
     for name, buf in buffer_dict.items():
         layer, suffix = get_layer_and_suffix(name)
         tag_prefix = f"{layer}"
@@ -127,6 +125,8 @@ def run_stats(args):
     net = run_load_model(args)
 
     net.eval()
+    logger.debug("Model inference started...")
+    logger.warning("TODO: This should use test dataset and not dummy input. Substitude run_test from run_qat.py by this. STATS instead of evaluation.")
     _ = one_inference(args, net)
 
     args.ex_name = make_ex_name(args)
@@ -134,6 +134,8 @@ def run_stats(args):
     os.makedirs(save_path, exist_ok=True)
     writer = SummaryWriter(save_path)
 
+    logger.debug("Model inspection started...")
     inspect(net)
+    logger.debug("Generating histogram of weights, biases, scales, and activations...")
     histogram(net, writer, step=0)
     logger.info(f"Run STATS completed successfully. TensorBoard logs saved to {save_path}")

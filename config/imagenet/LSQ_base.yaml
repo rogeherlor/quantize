@@ -33,7 +33,7 @@ x_grad_scale_mode: null
 different_optimizer_mode: True
 step_size_optimizer: AdamW
 pre_trained: True
-evaluation_mode: True
+evaluation_mode: False
 write_log: True
 ddp: False
 invisible_pgb: False

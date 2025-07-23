@@ -7,3 +7,4 @@ Añadir quantizacion Batch2D
 Añadir ViT
 Añadir quantizacion attention
 Igual modulo dequant para poder obtener mas facilmente los valores quantizados
+Sustituir run_test de qat por STATS
