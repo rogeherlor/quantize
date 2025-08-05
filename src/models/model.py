@@ -5,7 +5,7 @@ from .pytorchcv.mobilenetv2 import mobilenetv2_w1
 
 def create_model(args):
     model = None
-    if args.dataset_name == 'imagenet':
+    if args.dataset_name == 'imagenet' or args.dataset_name == 'imagenet-mini':
         if args.model == 'pytorchcv_preresnet18':
             model = preresnet18(pretrained=args.pre_trained)
         elif args.model == 'pytorchcv_preresnet34':

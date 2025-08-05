@@ -5,7 +5,9 @@ import torch.nn as nn
 from torchvision import transforms
 from torchvision.datasets import ImageFolder
 from torch.utils.data.distributed import DistributedSampler
-from torch.distributed import init_process_group
+import torch.multiprocessing as mp
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.distributed import init_process_group, destroy_process_group
 
 from src.logger import logger
 
@@ -15,12 +17,14 @@ import src.scheduler.lr_scheduler as lr_scheduler
 #========================================================================
 # create dataloaders
 #========================================================================
-def imagenet_dataloaders(batch_size, num_workers, pin_memory, DDP_mode = True, model = None):
+def imagenet_dataloaders(batch_size, num_workers, pin_memory, DDP_mode = True, model = None, mini=False):
     
-    logger.warning("Not definitive imagenet train/val data: test/val")
-    traindir = './data/imagenet/train'
-    valdir = './data/imagenet/val'
-    
+    traindir = './data3/imagenet/train'
+    valdir = './data3/imagenet/val'
+    if mini:
+        logger.warning("Not definitive imagenet train/val data: test/val")
+        traindir = './data/imagenet-mini/train'
+        valdir = './data/imagenet-mini/val'
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
     # The label of the first folder will be 0, the second will be 1, and so on.
@@ -42,6 +46,8 @@ def imagenet_dataloaders(batch_size, num_workers, pin_memory, DDP_mode = True, m
 def setup_dataloader(name, batch_size, nworkers, pin_memory, DDP_mode, model):
     if name == "imagenet":
         dataloader = imagenet_dataloaders(batch_size, nworkers, pin_memory, DDP_mode=DDP_mode,  model = model)
+    elif name == "imagenet-mini":
+        dataloader = imagenet_dataloaders(batch_size, nworkers, pin_memory, DDP_mode=DDP_mode,  model = model, mini=True)
     else:
         raise NotImplementedError
     return dataloader
@@ -223,8 +229,9 @@ def ddp_setup(rank: int, world_size: int):
     """
     os.environ["MASTER_ADDR"] = "localhost"
     os.environ["MASTER_PORT"] = "12355"
-    init_process_group(backend="nccl", rank=rank, world_size=world_size)
     torch.cuda.set_device(rank)
+    init_process_group(backend="nccl", rank=rank, world_size=world_size)
+    torch.distributed.barrier()
 
 def parallel_reduce(*argv):
     tensor = torch.FloatTensor(argv).cuda()

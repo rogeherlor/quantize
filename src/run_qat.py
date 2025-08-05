@@ -5,7 +5,9 @@ from tqdm import tqdm
 import torch
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
+import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.distributed import init_process_group, destroy_process_group
 from torch.utils.tensorboard import SummaryWriter
 
 from functools import partial
@@ -55,13 +57,14 @@ def run_test(args):
     
 def run_load_model(args):
     pin_memory = True if args.device == 'cuda' else False
-    dataloader = setup_dataloader(args.dataset_name, args.batch_size, args.nworkers, pin_memory = pin_memory, DDP_mode = args.ddp, model = args.model)
+    dataloader = setup_dataloader(args.dataset_name, args.batch_size, args.nworkers, pin_memory = pin_memory, DDP_mode = False, model = args.model)
     net = create_model(args)
     net = net.to(args.device)
     assert net != None
 
-    logger.info("Saving original model state dict..")
-    torch.save(net.state_dict(), f"./model_zoo/pytorchcv/{args.model}_{args.dataset_name}_original.pth")
+    if not args.ddp:
+        logger.info("Saving original model state dict..")
+        torch.save(net.state_dict(), f"./model_zoo/pytorchcv/{args.model}_{args.dataset_name}_original.pth")
 
     # logger.info("Exporting original model to ONNX format..")
     # onnx_dataloader = setup_dataloader(args.dataset_name, args.batch_size, nworkers=0, pin_memory = False, DDP_mode=False, model=args.model)
@@ -114,7 +117,6 @@ def run_load_model(args):
             logger.warning(f"No valid checkpoint file is provided !!! {args.init_from}")
     
     net = net.to(args.device)
-
     return net
 
 def run_one_epoch(net, dataloader, optimizers, criterion, epoch, mode, best_acc, args):
@@ -147,7 +149,8 @@ def run_one_epoch(net, dataloader, optimizers, criterion, epoch, mode, best_acc,
                 loss.backward()
                 optimizers.step()
             else:
-                outputs = net(inputs).cuda() if args.device == 'cuda' else net(inputs)
+                # outputs = net(inputs).cuda() if args.device == 'cuda' else net(inputs)
+                outputs = net(inputs)
                 loss, loss_dict = criterion(outputs, labels)
 
             # statistics
@@ -179,22 +182,29 @@ def run_one_epoch(net, dataloader, optimizers, criterion, epoch, mode, best_acc,
         
     return accuracy, top5_accuracy, avg_loss, best_acc, avg_loss_dict
 
-def run_train(rank, args, net):
+def run_train(rank, args):
     start_epoch = 0
     world_size = args.world_size
-    # setup the process groups
-    if args.ddp:
+
+    if args.ddp and args.device == 'cuda':
+        torch.cuda.set_device(rank)
+        device = f'cuda:{rank}'
         ddp_setup(rank, world_size)
         data_mode = True
+        ddp_initialized = True
     else:
+        device = args.device
         data_mode = False
+        ddp_initialized = False
+
+    args.device = device
     best_acc = 0.0
 
     logger.info(f"==> Preparing training for {args.model} {args.dataset_name}..")
     pin_memory = True if args.device == 'cuda' else False
     dataloader = setup_dataloader(args.dataset_name, args.batch_size, args.nworkers, pin_memory = pin_memory, DDP_mode = data_mode, model = args.model)
     
-    net = net.to(args.device)
+    net = run_load_model(args)
 
     if args.write_log:
         args.ex_name = make_ex_name(args)
@@ -207,15 +217,18 @@ def run_train(rank, args, net):
             if args.first_run:
                 logger.debug(net) 
                 logger.info(f"Number of learnable parameters: {sum(p.numel() for p in net.parameters() if p.requires_grad) / 1e6:.2f} M")
-    time.sleep(5)
-    if torch.cuda.device_count() >= 1:
-        if args.ddp:
-            if rank == 0:                  
-                logger.info("Let's use", torch.cuda.device_count(), "GPUs!")
-            # Convert BatchNorm to SyncBatchNorm. 
-            net = nn.SyncBatchNorm.convert_sync_batchnorm(net)
-            net = DDP(net, device_ids=[rank])
-            cudnn.benchmark = True
+    
+    if ddp_initialized and torch.distributed.is_initialized():
+        torch.distributed.barrier()
+    time.sleep(1)
+
+    if torch.cuda.device_count() >= 1 and ddp_initialized:
+        if rank == 0:
+            logger.info(f"Let's use {torch.cuda.device_count()} GPUs!")
+        # Convert BatchNorm to SyncBatchNorm. 
+        net = nn.SyncBatchNorm.convert_sync_batchnorm(net)
+        net = DDP(net, device_ids=[rank])
+        cudnn.benchmark = True
     
     # split parameters for different optimizers
     if args.different_optimizer_mode:
@@ -287,6 +300,10 @@ def run_train(rank, args, net):
             if best_acc == val_accuracy:
                 logger.info('Saving best acc model ..')
                 save_ckp(net, None, None, best_acc, epoch, best_acc, args.ddp, filename=os.path.join(save_path, 'best.pth'))
+    
+    if ddp_initialized and torch.distributed.is_initialized():
+        torch.distributed.barrier()
+        destroy_process_group()
 
 def run_qat(args):
     logger.debug("Run QAT arguments:\n", args)
@@ -295,17 +312,20 @@ def run_qat(args):
         args.ddp = False
         run_test(args)
     else:
-        net = run_load_model(args)
         if args.ddp == True:
             logger.info("DDP mode")
-            logger.warning("DDP mode not implemented yet")
+            mp.spawn( \
+                run_train, \
+                nprocs= args.world_size, \
+                args= (args,) \
+            )
         else:
             logger.info("Non-DDP mode")
             if args.device == 'cuda':
                 torch.cuda.synchronize()
             start = time.time()
             gpu = 0
-            run_train(gpu, args, net)
+            run_train(gpu, args)
             if args.device == 'cuda':
                 torch.cuda.synchronize()
             end = time.time()

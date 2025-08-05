@@ -3,8 +3,10 @@ Batchnorm2d? Se integra con la capa quantizada (folded) durante la inferencia? H
 
 Pasos:
 Obtener sus resultados del paper (train)
+Añadir quantizacion attention para ViT
 Añadir quantizacion Batch2D
-Añadir ViT
-Añadir quantizacion attention
-Igual modulo dequant para poder obtener mas facilmente los valores quantizados
+Ver como hacer modelo entero int
+
+Todo:
+Registrar de otra forma los parametros en vez de register_buffer porque solo se queda el ultimo batch y es memory intensive para la gpu. Hacerlo como una lista self.saved_outpus = {"x": [], "yq": [], ...}
 Sustituir run_test de qat por STATS

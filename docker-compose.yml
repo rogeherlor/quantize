@@ -7,17 +7,25 @@ services:
     privileged: true
     profiles:
       - quantize-gpu
-    runtime: nvidia # Comment if only CPU
+    runtime: nvidia
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=all
+      # - NCCL_DEBUG=INFO
+      # - NCCL_TIMEOUT=300
+      # - TORCH_NCCL_TRACE_BUFFER_SIZE=16384
+      # - NCCL_ASYNC_ERROR_HANDLING=1
+      # - TORCH_DISTRIBUTED_DEBUG=DETAIL
+      - NCCL_DEBUG=INFO
+      - NCCL_P2P_DISABLE=1 # Needed in docker. Try to not use docker to enable NVLink/PCIe
     volumes:
       - ./:/workspace
+      - /data3/rogelio:/workspace/data3
     stdin_open: true
     tty: true
     command: /bin/bash -c "tail -f /dev/null"
     network_mode: "host"
-    shm_size: 8g
+    shm_size: 8g # At least 4GB per GPU process
   
   quantize-cpu:
     build:
@@ -27,7 +35,6 @@ services:
     privileged: true
     profiles:
       - quantize-cpu
-    # runtime: nvidia # Comment if only CPU
     volumes:
       - ./:/workspace
     stdin_open: true

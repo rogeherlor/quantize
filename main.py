@@ -20,7 +20,7 @@ if __name__ == '__main__':
         config = yaml.safe_load(file.read())
     config = dotdict(config)   
     config.world_size = torch.cuda.device_count()
-    config.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    config.device = "cuda" if torch.cuda.is_available() else "cpu"
     logger.info(f"Number of GPUs: {config.world_size}")
     logger.info(f"Device: {config.device}")
 

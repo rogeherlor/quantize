@@ -1,9 +1,9 @@
 action: load # resume
 train_id: null
-dataset_name: imagenet
+dataset_name: imagenet-mini
 model: pytorchcv_vitb16 # pytorchcv_preresnet18 # pytorchcv_vitb16
 nepochs: 2 # 300
-batch_size: 32 #128
+batch_size: 32
 optimizer: SGD
 momentum: 0.9
 nesterov: False
@@ -26,7 +26,7 @@ init_num: 100
 w_initializer: null
 x_initializer: null
 w_quantizer: null
-x_qnautizer: null
+x_quantizer: null
 w_grad_scale_mode: null
 x_grad_scale_mode: null
 # Qparms Optimizer settings
@@ -35,7 +35,7 @@ step_size_optimizer: AdamW
 pre_trained: True
 evaluation_mode: False
 write_log: True
-ddp: False
+ddp: True
 invisible_pgb: False
 save_path: output
 save_mode: all_checkpoints
