@@ -1,0 +1,3 @@
+[submodule "src/models/depth/vggt"]
+	path = src/models/depth/vggt
+	url = https://github.com/rogeherlor/vggt
