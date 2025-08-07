@@ -17,7 +17,7 @@ services:
       # - NCCL_ASYNC_ERROR_HANDLING=1
       # - TORCH_DISTRIBUTED_DEBUG=DETAIL
       - NCCL_DEBUG=INFO
-      - NCCL_P2P_DISABLE=1 # Needed in docker. Try to not use docker to enable NVLink/PCIe
+      - NCCL_P2P_DISABLE=1 # Sirius no communication between GPUs
     volumes:
       - ./:/workspace
       - /data3/rogelio:/workspace/data3
@@ -25,7 +25,7 @@ services:
     tty: true
     command: /bin/bash -c "tail -f /dev/null"
     network_mode: "host"
-    shm_size: 8g # At least 4GB per GPU process
+    shm_size: 32g # At least 4GB per GPU process
   
   quantize-cpu:
     build:
@@ -41,7 +41,7 @@ services:
     tty: true
     command: /bin/bash -c "tail -f /dev/null"
     network_mode: "host"
-    shm_size: 8g
+    shm_size: 32g
 
 # docker-compose --profile quantize-gpu up --build -d
 # docker-compose --profile quantize-cpu up --build -d

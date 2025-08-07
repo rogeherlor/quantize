@@ -8,16 +8,18 @@
             "name": "Python Debugger: Current File",
             "type": "debugpy",
             "request": "launch",
-            "program": "/workspace/main.py",
+            "program": "main.py",
             "args": ["--mode", "QAT", // "STATS" "QAT"
                     "--num_bits", "16",
+                    "--lr", "0.1",
+                    "--weight_decay", "1e-4",
                     "--x_quantizer", "LSQ_quantizer", 
                     "--w_quantizer", "LSQ_quantizer", 
                     "--initializer", "LSQ_initializer",
                     "--init_from", "output/imagenet/pytorchcv_preresnet18/w_LSQ_initializer__x_LSQ_initializer/w_LSQ_quantizer__x_LSQ_quantizer/16bit/AdamW_for_s_SGD_for_others_LinearWarmupCosineAnnealing_lr0.1_wd0.1_xslr0.01_wslr0.01_xswd0.1_wswd0.1_w_wo_gs_x_wo_gs_wo_shift_init_num100_from_fp_model_wo_l1_reg_for_s_wo_od_wo_wn_wo_nv_2epochs-None/ckpt_1epoch.pth",
                 ],
             "console": "integratedTerminal",
-            "python": "/opt/conda/envs/quantize/bin/python"
+            "python": "/home/rogelio/miniconda3/envs/quantize/bin/python"
         }
     ]
 }

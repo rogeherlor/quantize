@@ -29,12 +29,12 @@ class LSQ_quantizer(nn.Module):
 
     def forward(self, x, Qparms, Qn, Qp, num_elements, grad_scale_mode):
         scale = Qparms['scale']
-        self.register_buffer("x", x.detach())
-        self.register_buffer("scale", scale.detach())
+        # self.register_buffer("x", x.detach())
+        # self.register_buffer("scale", scale.detach())
         yq = _LSQ_quantizer(x, scale, Qn, Qp, num_elements, grad_scale_mode)
-        self.register_buffer("yq", yq.detach())
+        # self.register_buffer("yq", yq.detach())
         y = yq * scale
-        self.register_buffer("y", y.detach())
+        # self.register_buffer("y", y.detach())
         return y
     
     def scale_to_Qparms(self, Qparms, Qn, Qp):

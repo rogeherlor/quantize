@@ -69,7 +69,7 @@ class QConv2d(nn.Conv2d):
 
     def forward(self, input):
         return _forward_common(self, input)
-
+    
 
 def _forward_common(module, input):
     if module.weight_norm in ["WN", "LWN"]:
@@ -113,3 +113,40 @@ def Qparms_to_dev(x, Qparms):
     for iname in Qparms.keys():
         Qparms[iname].data = Qparms[iname].data.to(dev)
     
+    
+class QLayerNorm(nn.LayerNorm):
+    def __init__(self, normalized_shape, eps=1e-5, elementwise_affine=True,
+                 num_bits=None, x_quantizer=None, x_initializer=None,
+                 x_grad_scale_mode="LSQ_grad_scale", first_layer=False):
+        super().__init__(normalized_shape, eps, elementwise_affine)
+
+        self.num_bits = num_bits
+        self.x_grad_scale_mode = x_grad_scale_mode
+        self.first_layer = first_layer
+        self.x_Qparms = {}
+        self.x_quantizer = x_quantizer(self, num_bits, "activation") if x_quantizer else None
+        self.x_initializer = x_initializer
+        self.register_buffer('init_state', torch.tensor(False))
+
+    def forward(self, input):
+        # Optional: quantize input before normalization
+        if self.init_state == False:
+            if self.x_quantizer is not None and self.x_initializer is not None:
+                Qparms_to_dev(input, self.x_Qparms)
+                mode = "symmetric" if self.first_layer else "asymmetric"
+                self.x_initializer(input, self.x_Qparms, self.x_Qn, self.x_Qp, self.x_quantizer, mode)
+                self.x_quantizer.scale_to_Qparms(self.x_Qparms, self.x_Qn, self.x_Qp)
+
+        if self.x_quantizer is not None:
+            input = self.x_quantizer(input, self.x_Qparms, self.x_Qn, self.x_Qp,
+                                     input.numel(), self.x_grad_scale_mode)
+
+        # Apply LayerNorm
+        out = F.layer_norm(input, self.normalized_shape, self.weight, self.bias, self.eps)
+
+        # Optional: quantize output (comment out if not desired)
+        # if self.x_quantizer is not None:
+        #     out = self.x_quantizer(out, self.x_Qparms, self.x_Qn, self.x_Qp,
+        #                            out.numel(), self.x_grad_scale_mode)
+
+        return out

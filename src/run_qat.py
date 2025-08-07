@@ -23,9 +23,14 @@ from src.utils import *
 from src.scheduler_optimizer_class import scheduler_optimizer_class
 from src.make_ex_name import *
 
+def is_cuda_device(device):
+    """Check if device is CUDA (handles both 'cuda' and 'cuda:X' formats)"""
+    return isinstance(device, str) and device.startswith('cuda')
+
 def run_test(args):
     logger.info(f"==> Preparing testing for {args.dataset_name}..")
-    pin_memory = True if args.device == 'cuda' else False
+    is_cuda = is_cuda_device(args.device)
+    pin_memory = True if is_cuda else False
     dataloader = setup_dataloader(args.dataset_name, args.batch_size, args.nworkers, pin_memory = pin_memory, DDP_mode = False, model = args.model)
     net = create_model(args)
     assert net != None
@@ -37,12 +42,12 @@ def run_test(args):
         net = run_load_model(args)
         # net = load_from_FP32_model(args.init_from, net)
 
-    cudnn.benchmark = True if args.device == 'cuda' else False
+    cudnn.benchmark = True if is_cuda else False
         
     task_loss_fn = nn.CrossEntropyLoss()
     criterion_val = Multiple_Loss( {"task_loss": task_loss_fn})       
         
-    val_accuracy, val_top5_accuracy,  val_loss, best_acc, val_loss_dict   = run_one_epoch(net, dataloader, None, criterion_val, 0, "val", 0, args)
+    val_accuracy, val_top5_accuracy,  val_loss, best_acc, val_loss_dict   = run_one_epoch(net, dataloader, None, criterion_val, 0, "val", 0, args, ddp_initialized=False)
     logger.info(f'[FP32 model] val_Loss: {val_loss_dict["task_loss"].item():.5f}, val_top1_Acc: {val_accuracy:.5f}, val_top5_Acc: {val_top5_accuracy:.5f}')
     
     if args.write_log:
@@ -56,7 +61,8 @@ def run_test(args):
         log_detailed_params(writer, net, prefix='test-')
     
 def run_load_model(args):
-    pin_memory = True if args.device == 'cuda' else False
+    is_cuda = is_cuda_device(args.device)
+    pin_memory = True if is_cuda else False
     dataloader = setup_dataloader(args.dataset_name, args.batch_size, args.nworkers, pin_memory = pin_memory, DDP_mode = False, model = args.model)
     net = create_model(args)
     net = net.to(args.device)
@@ -119,7 +125,7 @@ def run_load_model(args):
     net = net.to(args.device)
     return net
 
-def run_one_epoch(net, dataloader, optimizers, criterion, epoch, mode, best_acc, args):
+def run_one_epoch(net, dataloader, optimizers, criterion, epoch, mode, best_acc, args, ddp_initialized=False):
     if mode == "train":
         net.train()
         torch.set_grad_enabled(True)
@@ -169,7 +175,7 @@ def run_one_epoch(net, dataloader, optimizers, criterion, epoch, mode, best_acc,
             
             pbar.update(1)
 
-    if args.ddp:
+    if ddp_initialized and args.ddp:
         total_loss, total_num_correct, total_num_correct5 = parallel_reduce(total_loss, total_num_correct, total_num_correct5)
         total_loss_dict = parallel_reduce_for_dict(total_loss_dict)
         total_num_sample = args.world_size * total_num_sample
@@ -185,13 +191,13 @@ def run_one_epoch(net, dataloader, optimizers, criterion, epoch, mode, best_acc,
 def run_train(rank, args):
     start_epoch = 0
     world_size = args.world_size
+    is_cuda = is_cuda_device(args.device)
 
-    if args.ddp and args.device == 'cuda':
-        torch.cuda.set_device(rank)
+    if args.ddp and is_cuda:
         device = f'cuda:{rank}'
         ddp_setup(rank, world_size)
         data_mode = True
-        ddp_initialized = True
+        ddp_initialized = torch.distributed.is_initialized()
     else:
         device = args.device
         data_mode = False
@@ -201,7 +207,7 @@ def run_train(rank, args):
     best_acc = 0.0
 
     logger.info(f"==> Preparing training for {args.model} {args.dataset_name}..")
-    pin_memory = True if args.device == 'cuda' else False
+    pin_memory = True if is_cuda else False
     dataloader = setup_dataloader(args.dataset_name, args.batch_size, args.nworkers, pin_memory = pin_memory, DDP_mode = data_mode, model = args.model)
     
     net = run_load_model(args)
@@ -217,10 +223,6 @@ def run_train(rank, args):
             if args.first_run:
                 logger.debug(net) 
                 logger.info(f"Number of learnable parameters: {sum(p.numel() for p in net.parameters() if p.requires_grad) / 1e6:.2f} M")
-    
-    if ddp_initialized and torch.distributed.is_initialized():
-        torch.distributed.barrier()
-    time.sleep(1)
 
     if torch.cuda.device_count() >= 1 and ddp_initialized:
         if rank == 0:
@@ -268,15 +270,15 @@ def run_train(rank, args):
     all_schedulers = Multiple_optimizer_scheduler(scheduler_dict)
 
     logger.info("Inference before training..")
-    val_accuracy, val_top5_accuracy,  total_val_loss, best_acc, val_loss_dict = run_one_epoch(net, dataloader, all_optimizers, criterion, 0, "val", best_acc, args)
+    val_accuracy, val_top5_accuracy,  total_val_loss, best_acc, val_loss_dict = run_one_epoch(net, dataloader, all_optimizers, criterion, 0, "val", best_acc, args, ddp_initialized)
     if rank == 0:
         logger.info(f'Before learning val_Loss: {val_loss_dict["task_loss"].item():.4f}, val_Acc: {val_accuracy:.4f}')
     logger.info("Training..")
     for epoch in range(start_epoch, args.nepochs):
         if args.ddp:
             dataloader["train"].sampler.set_epoch(epoch)
-        train_accuracy, train_top5_accuracy, total_train_loss, _, train_loss_dict = run_one_epoch(net, dataloader, all_optimizers, criterion, epoch, "train", best_acc, args)
-        val_accuracy, val_top5_accuracy,  total_val_loss, best_acc, val_loss_dict   = run_one_epoch(net, dataloader, all_optimizers, criterion, epoch, "val", best_acc, args)
+        train_accuracy, train_top5_accuracy, total_train_loss, _, train_loss_dict = run_one_epoch(net, dataloader, all_optimizers, criterion, epoch, "train", best_acc, args, ddp_initialized)
+        val_accuracy, val_top5_accuracy,  total_val_loss, best_acc, val_loss_dict   = run_one_epoch(net, dataloader, all_optimizers, criterion, epoch, "val", best_acc, args, ddp_initialized)
         if rank == 0:
             logger.info(f"[Train] Epoch= {epoch}, train_total_loss: {total_train_loss.item():.5f}, train_task_loss: {train_loss_dict['task_loss'].item():.5f}, train_top1_Acc: {train_accuracy:.5f}, train_top5_Acc: {train_top5_accuracy:.5f}")
             logger.info(f"[Val] Epoch= {epoch}, val_Loss: {val_loss_dict['task_loss'].item():.5f}, val_top1_Acc: {val_accuracy:.3f}, val_top5_Acc: {val_top5_accuracy:.5f}")
@@ -301,7 +303,7 @@ def run_train(rank, args):
                 logger.info('Saving best acc model ..')
                 save_ckp(net, None, None, best_acc, epoch, best_acc, args.ddp, filename=os.path.join(save_path, 'best.pth'))
     
-    if ddp_initialized and torch.distributed.is_initialized():
+    if ddp_initialized:
         torch.distributed.barrier()
         destroy_process_group()
 
@@ -321,12 +323,12 @@ def run_qat(args):
             )
         else:
             logger.info("Non-DDP mode")
-            if args.device == 'cuda':
+            if torch.cuda.is_available():
                 torch.cuda.synchronize()
             start = time.time()
             gpu = 0
             run_train(gpu, args)
-            if args.device == 'cuda':
+            if torch.cuda.is_available():
                 torch.cuda.synchronize()
             end = time.time()
             logger.info(f"Training elapsed time: {end - start:.3f} seconds")

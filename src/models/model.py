@@ -2,6 +2,7 @@ from ..logger import logger
 from .pytorchcv.vit import vitb16
 from .pytorchcv.preresnet import preresnet18, preresnet34
 from .pytorchcv.mobilenetv2 import mobilenetv2_w1
+from .depth.loader import vggt
 
 def create_model(args):
     model = None
@@ -16,7 +17,7 @@ def create_model(args):
             model = vitb16(pretrained=args.pre_trained)
     elif args.dataset_name == 'RealEstate10K':
         if args.model == 'vggt':
-            model = None
+            model = vggt(pretrained=args.pre_trained)
     if model == None:
         logger.error('Model architecture `%s` for `%s` dataset is not supported', args.model, args.dataset_name)
         exit(-1)

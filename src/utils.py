@@ -19,8 +19,8 @@ import src.scheduler.lr_scheduler as lr_scheduler
 #========================================================================
 def imagenet_dataloaders(batch_size, num_workers, pin_memory, DDP_mode = True, model = None, mini=False):
     
-    traindir = './data3/imagenet/train'
-    valdir = './data3/imagenet/val'
+    traindir = '/data3/rogelio/imagenet/train' # 'data3/imagenet/train'
+    valdir = '/data3/rogelio/imagenet/val' # 'data3/imagenet/val'
     if mini:
         logger.warning("Not definitive imagenet train/val data: test/val")
         traindir = './data/imagenet-mini/train'
@@ -228,7 +228,7 @@ def ddp_setup(rank: int, world_size: int):
         world_size: Total number of processes
     """
     os.environ["MASTER_ADDR"] = "localhost"
-    os.environ["MASTER_PORT"] = "12355"
+    os.environ["MASTER_PORT"] = "12375" # "12355"
     torch.cuda.set_device(rank)
     init_process_group(backend="nccl", rank=rank, world_size=world_size)
     torch.distributed.barrier()

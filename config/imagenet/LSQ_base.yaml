@@ -1,9 +1,9 @@
 action: load # resume
 train_id: null
-dataset_name: imagenet-mini
-model: pytorchcv_vitb16 # pytorchcv_preresnet18 # pytorchcv_vitb16
-nepochs: 2 # 300
-batch_size: 32
+dataset_name: imagenet # imagenet-mini
+model: pytorchcv_preresnet18 # pytorchcv_preresnet18 # pytorchcv_vitb16
+nepochs: 90
+batch_size: 128
 optimizer: SGD
 momentum: 0.9
 nesterov: False
