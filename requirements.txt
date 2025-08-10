@@ -8,5 +8,9 @@ tensorboard-data-server == 0.7.2
 tqdm == 4.67.1
 requests == 2.32.4
 matplotlib == 3.10.3
+
 huggingface_hub == 0.34.3
 einops == 0.8.1
+hydra-core == 1.3.2
+iopath == 0.1.10
+wcmatch == 10.1

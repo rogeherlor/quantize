@@ -192,6 +192,9 @@ def replace_module(model, replacement_dict={}, exception_dict={}, arch="pytorchc
         model.features.init_block.conv = replace_single_module(new_cls=exception_dict['__first__'], current_module=model.features.init_block.conv)
         print("fin init")
         model.output = replace_single_module(new_cls=exception_dict['__last_for_mobilenet__'], current_module=model.output)
+    elif arch == "pytorchcv_vitb16":
+        model.conv_proj = replace_single_module(new_cls=exception_dict['__first__'], current_module=model.conv_proj)
+        model.heads.head = replace_single_module(new_cls=exception_dict['__last__'], current_module=model.heads.head)
         
     return model
 
