@@ -29,6 +29,9 @@ def is_cuda_device(device):
 
 def run_test(args):
     logger.info(f"==> Preparing testing for {args.dataset_name}..")
+    
+    args.device = f'cuda:{args.gpu_rank}'
+    
     is_cuda = is_cuda_device(args.device)
     pin_memory = True if is_cuda else False
     dataloader = setup_dataloader(args.dataset_name, args.batch_size, args.nworkers, pin_memory = pin_memory, DDP_mode = False, model = args.model)
@@ -156,8 +159,9 @@ def run_one_epoch(net, dataloader, optimizers, criterion, epoch, mode, best_acc,
                 optimizers.step()
             else:
                 # outputs = net(inputs).cuda() if args.device == 'cuda' else net(inputs)
-                outputs = net(inputs)
-                loss, loss_dict = criterion(outputs, labels)
+                with torch.no_grad():
+                    outputs = net(inputs)
+                    loss, loss_dict = criterion(outputs, labels)
 
             # statistics
             _, predicted       = torch.max(outputs.detach(), 1)
@@ -199,7 +203,10 @@ def run_train(rank, args):
         data_mode = True
         ddp_initialized = torch.distributed.is_initialized()
     else:
-        device = args.device
+        if is_cuda:
+            device = f'cuda:{args.gpu_rank}'
+        else:
+            device = args.device
         data_mode = False
         ddp_initialized = False
 
@@ -219,13 +226,13 @@ def run_train(rank, args):
         write_experiment_params(args, os.path.join(save_path, args.model+'.txt'))
         writer = SummaryWriter(save_path)
 
-        if rank == 0:
+        if rank == 0 or not args.ddp:
             if args.first_run:
                 logger.debug(net) 
                 logger.info(f"Number of learnable parameters: {sum(p.numel() for p in net.parameters() if p.requires_grad) / 1e6:.2f} M")
 
     if torch.cuda.device_count() >= 1 and ddp_initialized:
-        if rank == 0:
+        if rank == 0 or not args.ddp:
             logger.info(f"Let's use {torch.cuda.device_count()} GPUs!")
         # Convert BatchNorm to SyncBatchNorm. 
         net = nn.SyncBatchNorm.convert_sync_batchnorm(net)
@@ -237,7 +244,7 @@ def run_train(rank, args):
         sparams, params = split_params(\
             net, weight_decay=args.weight_decay, lr = args.lr, x_lr= args.x_step_size_lr, \
                 w_lr= args.w_step_size_lr, x_wd = args.x_step_size_wd, w_wd = args.w_step_size_wd)
-        if rank == 0:
+        if rank == 0 or not args.ddp:
             logger.info(f"sparams {sparams}")
             logger.info("========================================================================================================================")
     else:
@@ -271,7 +278,7 @@ def run_train(rank, args):
 
     logger.info("Inference before training..")
     val_accuracy, val_top5_accuracy,  total_val_loss, best_acc, val_loss_dict = run_one_epoch(net, dataloader, all_optimizers, criterion, 0, "val", best_acc, args, ddp_initialized)
-    if rank == 0:
+    if rank == 0 or not args.ddp:
         logger.info(f'Before learning val_Loss: {val_loss_dict["task_loss"].item():.4f}, val_Acc: {val_accuracy:.4f}')
     logger.info("Training..")
     for epoch in range(start_epoch, args.nepochs):
@@ -279,7 +286,7 @@ def run_train(rank, args):
             dataloader["train"].sampler.set_epoch(epoch)
         train_accuracy, train_top5_accuracy, total_train_loss, _, train_loss_dict = run_one_epoch(net, dataloader, all_optimizers, criterion, epoch, "train", best_acc, args, ddp_initialized)
         val_accuracy, val_top5_accuracy,  total_val_loss, best_acc, val_loss_dict   = run_one_epoch(net, dataloader, all_optimizers, criterion, epoch, "val", best_acc, args, ddp_initialized)
-        if rank == 0:
+        if rank == 0 or not args.ddp:
             logger.info(f"[Train] Epoch= {epoch}, train_total_loss: {total_train_loss.item():.5f}, train_task_loss: {train_loss_dict['task_loss'].item():.5f}, train_top1_Acc: {train_accuracy:.5f}, train_top5_Acc: {train_top5_accuracy:.5f}")
             logger.info(f"[Val] Epoch= {epoch}, val_Loss: {val_loss_dict['task_loss'].item():.5f}, val_top1_Acc: {val_accuracy:.3f}, val_top5_Acc: {val_top5_accuracy:.5f}")
         # update coefficients by scheduler
@@ -312,6 +319,8 @@ def run_qat(args):
 
     if args.evaluation_mode:
         args.ddp = False
+        gpu = args.gpu_rank
+        logger.info(f"Using GPU rank: {gpu}")
         run_test(args)
     else:
         if args.ddp == True:
@@ -326,7 +335,8 @@ def run_qat(args):
             if torch.cuda.is_available():
                 torch.cuda.synchronize()
             start = time.time()
-            gpu = 0
+            gpu = args.gpu_rank
+            logger.info(f"Using GPU rank: {gpu}")
             run_train(gpu, args)
             if torch.cuda.is_available():
                 torch.cuda.synchronize()

@@ -1,15 +1,15 @@
 action: load # resume
 train_id: null
-dataset_name: imagenet-mini # imagenet-mini
-model: pytorchcv_preresnet18 # pytorchcv_preresnet18 # pytorchcv_vitb16
-nepochs: 90
-batch_size: 128
+dataset_name: imagenet # imagenet-mini
+model: pytorchcv_vitb16 # pytorchcv_preresnet18 # pytorchcv_vitb16
+nepochs: 300
+batch_size: 32
 optimizer: SGD
 momentum: 0.9
 nesterov: False
 weight_norm: null
 lr_scheduler: LinearWarmupCosineAnnealing
-warmup_epochs: 10
+warmup_epochs: 20
 warmup_lr: 0.00001
 
 nworkers: 10
@@ -20,8 +20,8 @@ w_first_last_initializer: null
 x_first_last_initializer: null
 w_first_last_grad_scale_mode: null
 x_first_last_grad_scale_mode: null
-first_bits: 8
-last_bits: 8
+first_bits: 16
+last_bits: 16
 init_num: 100
 w_initializer: null
 x_initializer: null
@@ -36,6 +36,7 @@ pre_trained: True
 evaluation_mode: False
 write_log: True
 ddp: False
+gpu_rank: 1
 invisible_pgb: False
 save_path: output
-save_mode: all_checkpoints
+save_mode: xxxall_checkpoints

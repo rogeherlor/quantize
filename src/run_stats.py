@@ -1,6 +1,7 @@
 import os
 import time
 import numpy as np
+import torch
 
 from xml.parsers.expat import model
 
@@ -122,6 +123,10 @@ def histogram(net, writer, step=0):
 
 def run_stats(args):
     logger.debug("Run STATS arguments:\n", args)
+    
+    args.device = f'cuda:{args.gpu_rank}'
+    logger.info(f"Using GPU rank {args.gpu_rank} for stats")
+
     net = run_load_model(args)
 
     net.eval()
