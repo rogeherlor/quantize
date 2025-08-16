@@ -1,8 +1,8 @@
 # python main.py --mode QAT --num_bits 2 --lr 0.1 --weight_decay 1e-4 --x_quantizer LSQ_quantizer --w_quantizer LSQ_quantizer --initializer LSQ_initializer
 action: load # resume
 train_id: null
-dataset_name: co3d
-model: vggt
+dataset_name: imagenet # imagenet-mini
+model: pytorchcv_vitb16 # pytorchcv_preresnet18
 nepochs: 300
 batch_size: 32
 optimizer: SGD
@@ -34,7 +34,7 @@ x_grad_scale_mode: null
 different_optimizer_mode: True
 step_size_optimizer: AdamW
 pre_trained: True
-evaluation_mode: True
+evaluation_mode: False
 write_log: True
 ddp: False
 gpu_rank: 1

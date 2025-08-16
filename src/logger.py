@@ -1,7 +1,7 @@
 # src/logger.py
 import logging
 
-logger = logging.getLogger("src")
+logger = logging.getLogger("src_logger")
 logger.setLevel(logging.DEBUG)
 logger.propagate = False
 

@@ -1,5 +1,5 @@
 import os
-
+import sys
 import torch
 import torch.nn as nn
 from torchvision import transforms
@@ -13,6 +13,8 @@ from src.logger import logger
 
 import src.module_quantization as Q
 import src.scheduler.lr_scheduler as lr_scheduler
+
+from src.models.depth.vggt.training.trainer import Trainer
 
 #========================================================================
 # create dataloaders
@@ -43,11 +45,34 @@ def imagenet_dataloaders(batch_size, num_workers, pin_memory, DDP_mode = True, m
 
     return dataloaders
 
+def co3d_dataloaders(batch_size, num_workers, pin_memory, DDP_mode=True, **kwargs):
+    from hydra import initialize, compose
+
+    if not DDP_mode:
+        os.environ["LOCAL_RANK"] = "1"  # Set LOCAL_RANK to 1 for non-DDP mode
+        os.environ["RANK"] = "0"        # Set RANK to 0 for non-DDP mode
+        os.environ["WORLD_SIZE"] = "1"  # Set WORLD_SIZE to 1 for non-DDP mode
+        os.environ["MASTER_ADDR"] = "localhost"  # Set MASTER_ADDR for non-DDP mode
+        os.environ["MASTER_PORT"] = "12355"     # Set MASTER_PORT for non-DDP mode
+
+    with initialize(version_base=None, config_path="models/depth/vggt/training/config"):
+        cfg = compose(config_name="default")
+
+    trainer = Trainer(**cfg)
+
+    dataloaders = {}
+    dataloaders["train"] = trainer.train_dataset.get_loader(0)  # Get the loader for epoch 0
+    dataloaders["val"] = trainer.val_dataset.get_loader(0)      # Get the loader for epoch 0
+
+    return dataloaders
+
 def setup_dataloader(name, batch_size, nworkers, pin_memory, DDP_mode, model):
     if name == "imagenet":
         dataloader = imagenet_dataloaders(batch_size, nworkers, pin_memory, DDP_mode=DDP_mode,  model = model)
     elif name == "imagenet-mini":
         dataloader = imagenet_dataloaders(batch_size, nworkers, pin_memory, DDP_mode=DDP_mode,  model = model, mini=True)
+    elif name == "co3d":
+        dataloader = co3d_dataloaders(batch_size, nworkers, pin_memory, DDP_mode=DDP_mode)
     else:
         raise NotImplementedError
     return dataloader
@@ -181,8 +206,9 @@ def replace_module(model, replacement_dict={}, exception_dict={}, arch="pytorchc
                                   w_initializer = args.w_first_last_initializer, x_initializer = args.x_first_last_initializer, first_layer = False),
     }
     """ 
-    assert arch in ["pytorchcv_preresnet18", "pytorchcv_preresnet34", 'pytorchcv_mobilenetv2', "pytorchcv_vitb16"],\
-        ("Not support this type of architecture !")
+    assert arch in ["pytorchcv_preresnet18", "pytorchcv_preresnet34", "pytorchcv_mobilenetv2", \
+                    "pytorchcv_vitb16", "vggt"],\
+                    ("Not support this type of architecture !")
 
     model = replace_all(model, replacement_dict=replacement_dict)
     if arch in ["pytorchcv_preresnet18", "pytorchcv_preresnet34"]:
@@ -195,7 +221,11 @@ def replace_module(model, replacement_dict={}, exception_dict={}, arch="pytorchc
     elif arch == "pytorchcv_vitb16":
         model.conv_proj = replace_single_module(new_cls=exception_dict['__first__'], current_module=model.conv_proj)
         model.heads.head = replace_single_module(new_cls=exception_dict['__last__'], current_module=model.heads.head)
-        
+    elif arch == "vggt":
+        # model.features[0] = replace_single_module(new_cls=exception_dict['__first__'], current_module=model.features[0])
+        # model.classifier[-1] = replace_single_module(new_cls=exception_dict['__last__'], current_module=model.classifier[-1])
+        pass
+
     return model
 
 def split_params(model, weight_decay, lr, x_lr, w_lr, x_wd, w_wd):

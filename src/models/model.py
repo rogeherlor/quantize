@@ -15,7 +15,7 @@ def create_model(args):
             model = mobilenetv2_w1(pretrained=args.pre_trained)
         elif args.model == 'pytorchcv_vitb16':
             model = vitb16(pretrained=args.pre_trained)
-    elif args.dataset_name == 'RealEstate10K':
+    elif args.dataset_name == 'co3d':
         if args.model == 'vggt':
             model = vggt(pretrained=args.pre_trained)
     if model == None:

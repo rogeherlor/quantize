@@ -10,6 +10,8 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
 from torch.utils.tensorboard import SummaryWriter
 
+from hydra import initialize, compose
+
 from functools import partial
 
 from src.logger import logger
@@ -24,44 +26,57 @@ from src.scheduler_optimizer_class import scheduler_optimizer_class
 from src.make_ex_name import *
 
 def is_cuda_device(device):
-    """Check if device is CUDA (handles both 'cuda' and 'cuda:X' formats)"""
     return isinstance(device, str) and device.startswith('cuda')
 
 def run_test(args):
     logger.info(f"==> Preparing testing for {args.dataset_name}..")
-    
-    args.device = f'cuda:{args.gpu_rank}'
-    
-    is_cuda = is_cuda_device(args.device)
-    pin_memory = True if is_cuda else False
-    dataloader = setup_dataloader(args.dataset_name, args.batch_size, args.nworkers, pin_memory = pin_memory, DDP_mode = False, model = args.model)
-    net = create_model(args)
-    assert net != None
-    
-    net = net.to(args.device)
 
-    if args.init_from and os.path.isfile(args.init_from):
-        logger.info('==> Loading from checkpoint: ', args.init_from)
-        net = run_load_model(args)
-        # net = load_from_FP32_model(args.init_from, net)
+    if args.model == 'vggt':
+        os.environ["LOCAL_RANK"] = str(args.gpu_rank)
+        os.environ["RANK"] = str(args.gpu_rank)
+        os.environ["WORLD_SIZE"] = "1"
+        os.environ["MASTER_ADDR"] = "localhost"
+        os.environ["MASTER_PORT"] = "12355"
+        os.environ["NCCL_P2P_DISABLE"] = "1"
 
-    cudnn.benchmark = True if is_cuda else False
+        with initialize(version_base=None, config_path="models/depth/vggt/training/config"):
+            cfg = compose(config_name="default")
+
+        trainer = Trainer(**cfg)
+        trainer.run_val()
+    else:
+        args.device = f'cuda:{args.gpu_rank}'
         
-    task_loss_fn = nn.CrossEntropyLoss()
-    criterion_val = Multiple_Loss( {"task_loss": task_loss_fn})       
+        is_cuda = is_cuda_device(args.device)
+        pin_memory = True if is_cuda else False
+        dataloader = setup_dataloader(args.dataset_name, args.batch_size, args.nworkers, pin_memory = pin_memory, DDP_mode = False, model = args.model)
+        net = create_model(args)
+        assert net != None
         
-    val_accuracy, val_top5_accuracy,  val_loss, best_acc, val_loss_dict   = run_one_epoch(net, dataloader, None, criterion_val, 0, "val", 0, args, ddp_initialized=False)
-    logger.info(f'[FP32 model] val_Loss: {val_loss_dict["task_loss"].item():.5f}, val_top1_Acc: {val_accuracy:.5f}, val_top5_Acc: {val_top5_accuracy:.5f}')
-    
-    if args.write_log:
-        args.ex_name = make_ex_name(args)
-        save_path = os.path.join(args.save_path, "test", args.dataset_name, args.ex_name)
-        os.makedirs(save_path, exist_ok=True)
-        writer = SummaryWriter(save_path)
-        writer.add_scalar("top1_accuracy/2.val", val_accuracy, 0)
-        writer.add_scalar("top5_accuracy/2.val", val_top5_accuracy, 0)
-        writer.add_scalar("loss/3.val_cross_entropy", val_loss_dict["task_loss"], 0)
-        log_detailed_params(writer, net, prefix='test-')
+        net = net.to(args.device)
+
+        if args.init_from and os.path.isfile(args.init_from):
+            logger.info('==> Loading from checkpoint: ', args.init_from)
+            net = run_load_model(args)
+            # net = load_from_FP32_model(args.init_from, net)
+
+        cudnn.benchmark = True if is_cuda else False
+            
+        task_loss_fn = nn.CrossEntropyLoss()
+        criterion_val = Multiple_Loss( {"task_loss": task_loss_fn})       
+            
+        val_accuracy, val_top5_accuracy,  val_loss, best_acc, val_loss_dict   = run_one_epoch(net, dataloader, None, criterion_val, 0, "val", 0, args, ddp_initialized=False)
+        logger.info(f'[FP32 model] val_Loss: {val_loss_dict["task_loss"].item():.5f}, val_top1_Acc: {val_accuracy:.5f}, val_top5_Acc: {val_top5_accuracy:.5f}')
+        
+        if args.write_log:
+            args.ex_name = make_ex_name(args)
+            save_path = os.path.join(args.save_path, "test", args.dataset_name, args.ex_name)
+            os.makedirs(save_path, exist_ok=True)
+            writer = SummaryWriter(save_path)
+            writer.add_scalar("top1_accuracy/2.val", val_accuracy, 0)
+            writer.add_scalar("top5_accuracy/2.val", val_top5_accuracy, 0)
+            writer.add_scalar("loss/3.val_cross_entropy", val_loss_dict["task_loss"], 0)
+            log_detailed_params(writer, net, prefix='test-')
     
 def run_load_model(args):
     is_cuda = is_cuda_device(args.device)
