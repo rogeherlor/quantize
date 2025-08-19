@@ -25,18 +25,15 @@ from src.utils import *
 from src.scheduler_optimizer_class import scheduler_optimizer_class
 from src.make_ex_name import *
 
-def is_cuda_device(device):
-    return isinstance(device, str) and device.startswith('cuda')
-
 def run_test(args):
     logger.info(f"==> Preparing testing for {args.dataset_name}..")
 
     if args.model == 'vggt':
-        os.environ["LOCAL_RANK"] = str(args.gpu_rank)
-        os.environ["RANK"] = str(args.gpu_rank)
-        os.environ["WORLD_SIZE"] = "1"
+        os.environ["LOCAL_RANK"] = "0"
+        os.environ["RANK"] = "0"
+        os.environ["WORLD_SIZE"] = str(args.world_size) if args.ddp else "1"
         os.environ["MASTER_ADDR"] = "localhost"
-        os.environ["MASTER_PORT"] = "12355"
+        os.environ["MASTER_PORT"] = "12395"
         os.environ["NCCL_P2P_DISABLE"] = "1"
 
         with initialize(version_base=None, config_path="models/depth/vggt/training/config"):
@@ -45,10 +42,7 @@ def run_test(args):
         trainer = Trainer(**cfg)
         trainer.run_val()
     else:
-        args.device = f'cuda:{args.gpu_rank}'
-        
-        is_cuda = is_cuda_device(args.device)
-        pin_memory = True if is_cuda else False
+        pin_memory = True if args.device == 'cuda' else False
         dataloader = setup_dataloader(args.dataset_name, args.batch_size, args.nworkers, pin_memory = pin_memory, DDP_mode = False, model = args.model)
         net = create_model(args)
         assert net != None
@@ -60,8 +54,8 @@ def run_test(args):
             net = run_load_model(args)
             # net = load_from_FP32_model(args.init_from, net)
 
-        cudnn.benchmark = True if is_cuda else False
-            
+        cudnn.benchmark = True if args.device == 'cuda' else False
+
         task_loss_fn = nn.CrossEntropyLoss()
         criterion_val = Multiple_Loss( {"task_loss": task_loss_fn})       
             
@@ -79,8 +73,7 @@ def run_test(args):
             log_detailed_params(writer, net, prefix='test-')
     
 def run_load_model(args):
-    is_cuda = is_cuda_device(args.device)
-    pin_memory = True if is_cuda else False
+    pin_memory = True if args.device == 'cuda' else False
     dataloader = setup_dataloader(args.dataset_name, args.batch_size, args.nworkers, pin_memory = pin_memory, DDP_mode = False, model = args.model)
     net = create_model(args)
     net = net.to(args.device)
@@ -210,26 +203,20 @@ def run_one_epoch(net, dataloader, optimizers, criterion, epoch, mode, best_acc,
 def run_train(rank, args):
     start_epoch = 0
     world_size = args.world_size
-    is_cuda = is_cuda_device(args.device)
 
-    if args.ddp and is_cuda:
-        device = f'cuda:{rank}'
+    if args.ddp:
+        args.device = f'cuda:{rank}'
         ddp_setup(rank, world_size)
         data_mode = True
         ddp_initialized = torch.distributed.is_initialized()
     else:
-        if is_cuda:
-            device = f'cuda:{args.gpu_rank}'
-        else:
-            device = args.device
         data_mode = False
         ddp_initialized = False
 
-    args.device = device
     best_acc = 0.0
 
     logger.info(f"==> Preparing training for {args.model} {args.dataset_name}..")
-    pin_memory = True if is_cuda else False
+    pin_memory = True if args.device == 'cuda' else False
     dataloader = setup_dataloader(args.dataset_name, args.batch_size, args.nworkers, pin_memory = pin_memory, DDP_mode = data_mode, model = args.model)
     
     net = run_load_model(args)
@@ -334,8 +321,7 @@ def run_qat(args):
 
     if args.evaluation_mode:
         args.ddp = False
-        gpu = args.gpu_rank
-        logger.info(f"Using GPU rank: {gpu}")
+        logger.info(f"Visible GPU rank: {args.gpu_rank}. Default cuda:0")
         run_test(args)
     else:
         if args.ddp == True:
@@ -350,9 +336,8 @@ def run_qat(args):
             if torch.cuda.is_available():
                 torch.cuda.synchronize()
             start = time.time()
-            gpu = args.gpu_rank
-            logger.info(f"Using GPU rank: {gpu}")
-            run_train(gpu, args)
+            logger.info(f"Visible GPU rank: {args.gpu_rank}. Default cuda:0")
+            run_train(0, args)
             if torch.cuda.is_available():
                 torch.cuda.synchronize()
             end = time.time()

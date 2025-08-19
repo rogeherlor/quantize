@@ -1,6 +1,7 @@
 #========================================================================
 # import modules 
 #========================================================================
+import os
 import torch
 import time
 import yaml
@@ -18,7 +19,11 @@ from src.run_stats import run_stats
 if __name__ == '__main__':
     with open('./config/imagenet/LSQ_base.yaml') as file:
         config = yaml.safe_load(file.read())
-    config = dotdict(config)   
+    config = dotdict(config)
+
+    # Before any torch operations
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(config.gpu_rank)
+
     config.world_size = torch.cuda.device_count()
     config.device = "cuda" if torch.cuda.is_available() else "cpu"
     logger.info(f"Number of GPUs: {config.world_size}")
