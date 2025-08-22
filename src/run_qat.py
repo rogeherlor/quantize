@@ -10,8 +10,6 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
 from torch.utils.tensorboard import SummaryWriter
 
-from hydra import initialize, compose
-
 from functools import partial
 
 from src.logger import logger
@@ -28,49 +26,35 @@ from src.make_ex_name import *
 def run_test(args):
     logger.info(f"==> Preparing testing for {args.dataset_name}..")
 
-    if args.model == 'vggt':
-        os.environ["LOCAL_RANK"] = "0"
-        os.environ["RANK"] = "0"
-        os.environ["WORLD_SIZE"] = str(args.world_size) if args.ddp else "1"
-        os.environ["MASTER_ADDR"] = "localhost"
-        os.environ["MASTER_PORT"] = "12395"
-        os.environ["NCCL_P2P_DISABLE"] = "1"
+    pin_memory = True if args.device == 'cuda' else False
+    dataloader = setup_dataloader(args.dataset_name, args.batch_size, args.nworkers, pin_memory = pin_memory, DDP_mode = False, model = args.model)
+    net = create_model(args)
+    assert net != None
+    
+    net = net.to(args.device)
 
-        with initialize(version_base=None, config_path="models/depth/vggt/training/config"):
-            cfg = compose(config_name="default")
+    if args.init_from and os.path.isfile(args.init_from):
+        logger.info('==> Loading from checkpoint: ', args.init_from)
+        net = run_load_model(args)
+        # net = load_from_FP32_model(args.init_from, net)
 
-        trainer = Trainer(**cfg)
-        trainer.run_val()
-    else:
-        pin_memory = True if args.device == 'cuda' else False
-        dataloader = setup_dataloader(args.dataset_name, args.batch_size, args.nworkers, pin_memory = pin_memory, DDP_mode = False, model = args.model)
-        net = create_model(args)
-        assert net != None
+    cudnn.benchmark = True if args.device == 'cuda' else False
+
+    task_loss_fn = nn.CrossEntropyLoss()
+    criterion_val = Multiple_Loss( {"task_loss": task_loss_fn})       
         
-        net = net.to(args.device)
-
-        if args.init_from and os.path.isfile(args.init_from):
-            logger.info('==> Loading from checkpoint: ', args.init_from)
-            net = run_load_model(args)
-            # net = load_from_FP32_model(args.init_from, net)
-
-        cudnn.benchmark = True if args.device == 'cuda' else False
-
-        task_loss_fn = nn.CrossEntropyLoss()
-        criterion_val = Multiple_Loss( {"task_loss": task_loss_fn})       
-            
-        val_accuracy, val_top5_accuracy,  val_loss, best_acc, val_loss_dict   = run_one_epoch(net, dataloader, None, criterion_val, 0, "val", 0, args, ddp_initialized=False)
-        logger.info(f'[FP32 model] val_Loss: {val_loss_dict["task_loss"].item():.5f}, val_top1_Acc: {val_accuracy:.5f}, val_top5_Acc: {val_top5_accuracy:.5f}')
-        
-        if args.write_log:
-            args.ex_name = make_ex_name(args)
-            save_path = os.path.join(args.save_path, "test", args.dataset_name, args.ex_name)
-            os.makedirs(save_path, exist_ok=True)
-            writer = SummaryWriter(save_path)
-            writer.add_scalar("top1_accuracy/2.val", val_accuracy, 0)
-            writer.add_scalar("top5_accuracy/2.val", val_top5_accuracy, 0)
-            writer.add_scalar("loss/3.val_cross_entropy", val_loss_dict["task_loss"], 0)
-            log_detailed_params(writer, net, prefix='test-')
+    val_accuracy, val_top5_accuracy,  val_loss, best_acc, val_loss_dict   = run_one_epoch(net, dataloader, None, criterion_val, 0, "val", 0, args, ddp_initialized=False)
+    logger.info(f'[FP32 model] val_Loss: {val_loss_dict["task_loss"].item():.5f}, val_top1_Acc: {val_accuracy:.5f}, val_top5_Acc: {val_top5_accuracy:.5f}')
+    
+    if args.write_log:
+        args.ex_name = make_ex_name(args)
+        save_path = os.path.join(args.save_path, "test", args.dataset_name, args.ex_name)
+        os.makedirs(save_path, exist_ok=True)
+        writer = SummaryWriter(save_path)
+        writer.add_scalar("top1_accuracy/2.val", val_accuracy, 0)
+        writer.add_scalar("top5_accuracy/2.val", val_top5_accuracy, 0)
+        writer.add_scalar("loss/3.val_cross_entropy", val_loss_dict["task_loss"], 0)
+        log_detailed_params(writer, net, prefix='test-')
     
 def run_load_model(args):
     pin_memory = True if args.device == 'cuda' else False
@@ -322,23 +306,39 @@ def run_qat(args):
     if args.evaluation_mode:
         args.ddp = False
         logger.info(f"Visible GPU rank: {args.gpu_rank}. Default cuda:0")
-        run_test(args)
-    else:
-        if args.ddp == True:
-            logger.info("DDP mode")
-            mp.spawn( \
-                run_train, \
-                nprocs= args.world_size, \
-                args= (args,) \
-            )
+        if args.model == 'vggt':
+            from src.models.depth.qvggt import run_test_vggt
+            run_test_vggt(args)
         else:
-            logger.info("Non-DDP mode")
-            if torch.cuda.is_available():
-                torch.cuda.synchronize()
-            start = time.time()
-            logger.info(f"Visible GPU rank: {args.gpu_rank}. Default cuda:0")
-            run_train(0, args)
-            if torch.cuda.is_available():
-                torch.cuda.synchronize()
-            end = time.time()
-            logger.info(f"Training elapsed time: {end - start:.3f} seconds")
+            run_test(args)
+    else:
+        if args.model == 'vggt':
+            from src.models.depth.qvggt import run_train_vggt
+            if args.ddp == True:
+                logger.info("DDP mode")
+                mp.spawn( \
+                    run_train_vggt, \
+                    nprocs= args.world_size, \
+                    args= (args,) \
+                )
+            else:
+                run_train_vggt(0, args)
+        else:
+            if args.ddp == True:
+                logger.info("DDP mode")
+                mp.spawn( \
+                    run_train, \
+                    nprocs= args.world_size, \
+                    args= (args,) \
+                )
+            else:
+                logger.info("Non-DDP mode")
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize()
+                start = time.time()
+                logger.info(f"Visible GPU rank: {args.gpu_rank}. Default cuda:0")
+                run_train(0, args)
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize()
+                end = time.time()
+                logger.info(f"Training elapsed time: {end - start:.3f} seconds")

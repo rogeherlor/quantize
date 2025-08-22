@@ -128,15 +128,20 @@ def save_ckp(net, lr_scheduler, optimizer, best_acc, epoch, acc, ddp, filename='
         }
     torch.save(state, filename)
     
-def stepsize_init(net, dataloader, device, num_batches=1):
+def stepsize_init(net, dataloader, device, num_batches=1, dataset_name=""):
 
     net.train()
     torch.set_grad_enabled(False)
 
     with torch.no_grad():
-        for i, (inputs, labels) in enumerate(dataloader):
-            inputs, labels = inputs.to(device), labels.to(device)
-            outputs = net(inputs)
+        for i, batch in enumerate(dataloader):
+            if dataset_name == "co3d":
+                inputs = batch["images"].to(device)
+            else:
+                inputs, labels = batch
+                inputs, labels = inputs.to(device), labels.to(device)
+            _ = net(inputs)
+
             if i + 1 == num_batches:
                 break
 
@@ -147,48 +152,89 @@ def stepsize_init(net, dataloader, device, num_batches=1):
 
 def replace_all(model, replacement_dict={}):
     """
-    Replace all layers in the original model with new layers corresponding to `replacement_dict`.
-    E.g input example:
-    replacement_dict={ nn.Conv2d : partial(NIPS2019_QConv2d, bit=args.bit) }
-    """ 
+    replacement_dict = { nn.Conv2d: NewConvCtor, nn.Linear: NewLinearCtor }
+    where NewConvCtor/NewLinearCtor are callables (e.g., partials) that create the new layer.
+    """
+    def __replace_module(mod):
+        for module_name in list(mod._modules):  # list() to avoid dict-size change issues
+            m = mod._modules[module_name]
 
-    def __replace_module(model):
-        for module_name in model._modules:
-            m = model._modules[module_name]             
-            if type(m) in replacement_dict.keys():
+            if type(m) in replacement_dict:
+                new_ctor = replacement_dict[type(m)]
+
                 if isinstance(m, nn.Conv2d):
-                    new_module = replacement_dict[type(m)]
-                    model._modules[module_name] = new_module(in_channels=m.in_channels, 
-                            out_channels=m.out_channels, kernel_size=m.kernel_size, 
-                            stride=m.stride, padding=m.padding, dilation=m.dilation, 
-                            groups=m.groups, bias=(m.bias is not None))
-                
-                elif isinstance(m, nn.Linear):
-                    new_module = replacement_dict[type(m)]
-                    model._modules[module_name] = new_module(in_features=m.in_features, 
-                            out_features=m.out_features,
-                            bias=(m.bias is not None))
+                    new_layer = new_ctor(
+                        in_channels=m.in_channels,
+                        out_channels=m.out_channels,
+                        kernel_size=m.kernel_size,
+                        stride=m.stride,
+                        padding=m.padding,
+                        dilation=m.dilation,
+                        groups=m.groups,
+                        bias=(m.bias is not None),
+                    )
 
-            elif len(model._modules[module_name]._modules) > 0:
-                __replace_module(model._modules[module_name])
+                elif isinstance(m, nn.Linear):
+                    new_layer = new_ctor(
+                        in_features=m.in_features,
+                        out_features=m.out_features,
+                        bias=(m.bias is not None),
+                    )
+                else:
+                    continue
+
+                ref = next(m.parameters(), None)
+                if ref is not None:
+                    new_layer = new_layer.to(ref.device, dtype=ref.dtype)
+                new_layer.train(m.training)
+                
+                # Share parameters. If copy will duplicate in GPU memory.
+                new_layer.weight = m.weight
+                if m.bias is not None:
+                    new_layer.bias = m.bias
+
+                mod._modules[module_name] = new_layer
+
+            elif len(m._modules) > 0:
+                __replace_module(m)
 
     __replace_module(model)
-
     return model
 
 
 def replace_single_module(new_cls, current_module):
     m = current_module
-    if isinstance(m, Q.QConv2d):
-        return new_cls(in_channels=m.in_channels, 
-                out_channels=m.out_channels, kernel_size=m.kernel_size, 
-                stride=m.stride, padding=m.padding, dilation=m.dilation, 
-                groups=m.groups, bias=(m.bias is not None))
-    
-    elif isinstance(m, Q.QLinear):
-        return new_cls(in_features=m.in_features, out_features=m.out_features, bias=(m.bias is not None))        
+    if isinstance(m, nn.Conv2d):
+        new_layer = new_cls(
+            in_channels=m.in_channels,
+            out_channels=m.out_channels,
+            kernel_size=m.kernel_size,
+            stride=m.stride,
+            padding=m.padding,
+            dilation=m.dilation,
+            groups=m.groups,
+            bias=(m.bias is not None),
+        )
+    elif isinstance(m, nn.Linear):
+        new_layer = new_cls(
+            in_features=m.in_features,
+            out_features=m.out_features,
+            bias=(m.bias is not None),
+        )
+    else:
+        return None
 
-    return None
+    ref = next(m.parameters(), None)
+    if ref is not None:
+        new_layer = new_layer.to(ref.device, dtype=ref.dtype)
+    new_layer.train(m.training)
+
+    # Share parameters. If copy will duplicate in GPU memory.
+    new_layer.weight = m.weight
+    if m.bias is not None:
+        new_layer.bias = m.bias
+    
+    return new_layer
 
 def replace_module(model, replacement_dict={}, exception_dict={}, arch="pytorchcv_vitb16_imagenet"):
     """
@@ -222,8 +268,7 @@ def replace_module(model, replacement_dict={}, exception_dict={}, arch="pytorchc
         model.conv_proj = replace_single_module(new_cls=exception_dict['__first__'], current_module=model.conv_proj)
         model.heads.head = replace_single_module(new_cls=exception_dict['__last__'], current_module=model.heads.head)
     elif arch == "vggt":
-        # model.features[0] = replace_single_module(new_cls=exception_dict['__first__'], current_module=model.features[0])
-        # model.classifier[-1] = replace_single_module(new_cls=exception_dict['__last__'], current_module=model.classifier[-1])
+        model.aggregator.patch_embed.patch_embed.proj = replace_single_module(new_cls=exception_dict['__first__'], current_module=model.aggregator.patch_embed.patch_embed.proj)
         pass
 
     return model

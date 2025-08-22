@@ -23,3 +23,5 @@
         }
     ]
 }
+
+// python src/models/depth/vggt/evaluation/test_co3d.py --model_path /home/rogelio/quantize/model_zoo/vggt/vggt_1B_commercial.pt --co3d_dir /data3/rogelio/co3d/dataset/ --co3d_anno_dir /data3/rogelio/co3d/preprocessed_dataset/ --seed 0
