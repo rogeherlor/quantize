@@ -19,12 +19,12 @@ class LSQ_quantizer(nn.Module):
             else:
                 module.x_Qn = 0
                 module.x_Qp = 2 ** (num_bits  ) - 1
-            module.x_scale = nn.Parameter(torch.tensor([0.0]))
+            module.x_scale = nn.Parameter(torch.tensor([0.0], dtype=torch.float32)) # Cast at use
             module.x_Qparms['scale'] = module.x_scale
         elif mode == "weight":
             module.w_Qn = 2 ** (num_bits-1)
             module.w_Qp = 2 ** (num_bits-1) - 1
-            module.w_scale = nn.Parameter(torch.tensor([0.0]))
+            module.w_scale = nn.Parameter(torch.tensor([0.0], dtype=torch.float32)) # Cast at use
             module.w_Qparms['scale'] = module.w_scale
 
     def forward(self, x, Qparms, Qn, Qp, num_elements, grad_scale_mode):
@@ -33,43 +33,41 @@ class LSQ_quantizer(nn.Module):
         # self.register_buffer("scale", scale.detach())
         yq = _LSQ_quantizer(x, scale, Qn, Qp, num_elements, grad_scale_mode)
         # self.register_buffer("yq", yq.detach())
-        ## y = yq * scale
+        y = yq * scale
         # self.register_buffer("y", y.detach())
-        return yq
-    
+        return y
+
     def scale_to_Qparms(self, Qparms, Qn, Qp):
         Qparms["scale"].data = torch.full(Qparms["scale"].size(), Qparms["init_scale"].clone().detach(), device=Qparms["scale"].device)
 
 def _LSQ_quantizer(x, scale, Qn, Qp, num_elements, grad_scale_mode):
-  
-    # Qn_on_device = torch.tensor([Qn], dtype=torch.float).to(x.device) # Memory blow up
-    # Qp_on_device = torch.tensor([Qp], dtype=torch.float).to(x.device) # Memory blow up
-    Qn_on_device = torch.tensor(Qn, dtype=torch.float, device=x.device)
-    Qp_on_device = torch.tensor(Qp, dtype=torch.float, device=x.device)
+
+    scale = scale.to(dtype=x.dtype)
+
+    qn_t = torch.as_tensor(Qn, device=x.device, dtype=x.dtype)
+    qp_t = torch.as_tensor(Qp, device=x.device, dtype=x.dtype)
+
+    # Qn_on_device = torch.tensor(Qn, dtype=torch.float, device=x.device)
+    # Qp_on_device = torch.tensor(Qp, dtype=torch.float, device=x.device)
 
     # print(scale)
-    assert scale > 0, 'scale = {}, {}, {}'.format(scale, Qn_on_device, Qp_on_device)
+    assert scale > 0, 'scale = {}, {}, {}'.format(scale, qn_t, qp_t)
 
     # gradient scaling
     if num_elements > 0:
         if grad_scale_mode == "10_fac":
-            # grad_scale = torch.tensor(10.0).to(x.device)
             grad_scale = torch.tensor(10.0, device=x.device)
         elif grad_scale_mode == "LSQ_grad_scale":
-            grad_scale = 1.0 / torch.sqrt(num_elements * Qp_on_device)
+            grad_scale = 1.0 / torch.sqrt(num_elements * qp_t)
         else:
-            # grad_scale = torch.tensor(1.0).to(x.device)
             grad_scale = torch.tensor(1.0, device=x.device)
 
-        grad_scale = grad_scale.detach()  # prevents graph growth
         bw_scale   = scale * grad_scale
                 
         scale      = (scale - bw_scale).detach() + bw_scale
     
-    # x  = x / scale
-    x = x / scale.detach()
-    return x
-    x  = torch.min(torch.max(x, -Qn_on_device), Qp_on_device)
+    x  = x / scale
+    x = torch.clamp(x, min=-float(qn_t), max=float(qp_t))
     xq = torch.round(x)
     y  = (xq - x).detach() + x
     

@@ -8,6 +8,7 @@ from src.quantizer.uniform import *
 from src.quantizer.nonuniform import *
 from src.initializer import *
 
+from torch.utils.checkpoint import checkpoint
 
 #----------------------------------------------------------
 # Fully connected layer 
@@ -36,7 +37,12 @@ class QLinear(nn.Linear):
         self.register_buffer('init_state', torch.tensor(False))   
 
     def forward(self, input):
-        return _forward_common(self, input)
+        # A6000 (48 GB)
+        if self.training:
+            return checkpoint(_forward_common, self, input, use_reentrant=False)
+        else:
+            # with torch.no_grad():
+            return _forward_common(self, input)
 
 
 #----------------------------------------------------------
@@ -68,8 +74,12 @@ class QConv2d(nn.Conv2d):
         self.register_buffer('init_state', torch.tensor(False))   
 
     def forward(self, input):
-        return _forward_common(self, input)
-    
+        # A6000 (48 GB)
+        if self.training:
+            return checkpoint(_forward_common, self, input, use_reentrant=False)
+        else:
+            # with torch.no_grad():
+            return _forward_common(self, input)
 
 def _forward_common(module, input):
     if module.weight_norm in ["WN", "LWN"]:

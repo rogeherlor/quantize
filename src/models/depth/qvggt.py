@@ -32,11 +32,11 @@ def run_test_vggt(args):
 def replace(args, net):
     logger.info("==> Replacing model parameters..")
     replacement_dict = {
-        # nn.Conv2d : partial(Q.QConv2d, \
-        # num_bits=args.num_bits, w_grad_scale_mode = args.w_grad_scale_mode, \
-        # x_grad_scale_mode = args.x_grad_scale_mode, \
-        # weight_norm = args.weight_norm, w_quantizer = args.w_quantizer, x_quantizer = args.x_quantizer, \
-        # w_initializer = args.w_initializer, x_initializer = args.x_initializer), 
+        nn.Conv2d : partial(Q.QConv2d, \
+        num_bits=args.num_bits, w_grad_scale_mode = args.w_grad_scale_mode, \
+        x_grad_scale_mode = args.x_grad_scale_mode, \
+        weight_norm = args.weight_norm, w_quantizer = args.w_quantizer, x_quantizer = args.x_quantizer, \
+        w_initializer = args.w_initializer, x_initializer = args.x_initializer), 
         nn.Linear: partial(Q.QLinear,  \
         num_bits=args.num_bits, w_grad_scale_mode = args.w_grad_scale_mode, \
         x_grad_scale_mode = args.x_grad_scale_mode, \
@@ -81,9 +81,9 @@ def run_train_vggt(rank, args):
     trainer = Trainer(**cfg)
     trainer.model.module = replace(args, trainer.model.module)
 
-    # if args.action == 'load':
-    #     stepsize_init(trainer.model.module, trainer.train_dataset.get_loader(0), args.device, num_batches=1, dataset_name=args.dataset_name) #args.init_num
-    # 
+    if args.action == 'load':
+        stepsize_init(trainer.model.module, trainer.train_dataset.get_loader(0), args.device, num_batches=1, dataset_name=args.dataset_name) #args.init_num
+    
     # if args.different_optimizer_mode:
     #     sparams, params = split_params(\
     #         trainer.model.module, weight_decay=args.weight_decay, lr = args.lr, x_lr= args.x_step_size_lr, \
