@@ -42,13 +42,10 @@ class LSQ_quantizer(nn.Module):
 
 def _LSQ_quantizer(x, scale, Qn, Qp, num_elements, grad_scale_mode):
 
-    scale = scale.to(dtype=x.dtype)
-
-    qn_t = torch.as_tensor(Qn, device=x.device, dtype=x.dtype)
-    qp_t = torch.as_tensor(Qp, device=x.device, dtype=x.dtype)
-
     # Qn_on_device = torch.tensor(Qn, dtype=torch.float, device=x.device)
     # Qp_on_device = torch.tensor(Qp, dtype=torch.float, device=x.device)
+    qn_t = float(Qn)
+    qp_t = float(Qp)
 
     # print(scale)
     assert scale > 0, 'scale = {}, {}, {}'.format(scale, qn_t, qp_t)
@@ -62,14 +59,13 @@ def _LSQ_quantizer(x, scale, Qn, Qp, num_elements, grad_scale_mode):
         else:
             grad_scale = torch.tensor(1.0, device=x.device)
 
-        bw_scale   = scale * grad_scale
-                
-        scale      = (scale - bw_scale).detach() + bw_scale
+        bw_scale = scale * grad_scale
+        scale = (scale - bw_scale).detach() + bw_scale
     
     x  = x / scale
     x = torch.clamp(x, min=-float(qn_t), max=float(qp_t))
-    xq = torch.round(x)
-    y  = (xq - x).detach() + x
+    # xq = torch.round(x)
+    y  = (torch.round(x) - x).detach() + x
     
     # y  = scale * y
 

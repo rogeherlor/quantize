@@ -39,7 +39,7 @@ class QLinear(nn.Linear):
     def forward(self, input):
         # A6000 (48 GB)
         if self.training:
-            return checkpoint(_forward_common, self, input, use_reentrant=False)
+            return checkpoint(_forward_common, self, input, use_reentrant=False, preserve_rng_state=False)
         else:
             # with torch.no_grad():
             return _forward_common(self, input)
@@ -76,7 +76,7 @@ class QConv2d(nn.Conv2d):
     def forward(self, input):
         # A6000 (48 GB)
         if self.training:
-            return checkpoint(_forward_common, self, input, use_reentrant=False)
+            return checkpoint(_forward_common, self, input, use_reentrant=False, preserve_rng_state=False)
         else:
             # with torch.no_grad():
             return _forward_common(self, input)
@@ -121,4 +121,5 @@ def _forward_common(module, input):
 def Qparms_to_dev(x, Qparms):
     dev = x.device
     for iname in Qparms.keys():
-        Qparms[iname].data = Qparms[iname].data.to(dev)
+        if Qparms[iname].device != dev:
+            Qparms[iname].data = Qparms[iname].data.to(dev, non_blocking=True)
