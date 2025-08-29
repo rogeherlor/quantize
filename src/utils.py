@@ -49,7 +49,7 @@ def co3d_dataloaders(batch_size, num_workers, pin_memory, DDP_mode=True, **kwarg
     from hydra import initialize, compose
 
     if not DDP_mode:
-        os.environ["LOCAL_RANK"] = "1"  # Set LOCAL_RANK to 1 for non-DDP mode
+        os.environ["LOCAL_RANK"] = "0"  # Set LOCAL_RANK to 0 for non-DDP mode
         os.environ["RANK"] = "0"        # Set RANK to 0 for non-DDP mode
         os.environ["WORLD_SIZE"] = "1"  # Set WORLD_SIZE to 1 for non-DDP mode
         os.environ["MASTER_ADDR"] = "localhost"  # Set MASTER_ADDR for non-DDP mode

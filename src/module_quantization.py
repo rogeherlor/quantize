@@ -34,7 +34,7 @@ class QLinear(nn.Linear):
         self.x_quantizer= x_quantizer(self, num_bits, "activation") if x_quantizer != None else None
         self.w_initializer= w_initializer
         self.x_initializer= x_initializer
-        self.register_buffer('init_state', torch.tensor(False))   
+        self.register_buffer('init_state', torch.tensor(False))
 
     def forward(self, input):
         # A6000 (48 GB)
@@ -71,7 +71,7 @@ class QConv2d(nn.Conv2d):
         self.x_quantizer= x_quantizer(self, num_bits, "activation") if x_quantizer != None else None
         self.w_initializer= w_initializer
         self.x_initializer= x_initializer
-        self.register_buffer('init_state', torch.tensor(False))   
+        self.register_buffer('init_state', torch.tensor(False))
 
     def forward(self, input):
         # A6000 (48 GB)

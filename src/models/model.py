@@ -24,6 +24,7 @@ def create_model(args):
 
     logger.info('Created `%s` model for `%s` dataset' % (args.model, args.dataset_name))
     logger.info('Use pre-trained model = %s' % args.pre_trained)
+    logger.debug(f'Model structure:\n{model}')
 
     return model
 
