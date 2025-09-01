@@ -45,9 +45,22 @@ def imagenet_dataloaders(batch_size, num_workers, pin_memory, DDP_mode = True, m
 
     return dataloaders
 
+# Global cache for co3d dataloaders to avoid recreating Trainer instances. TODO: better implementation
+_co3d_dataloaders_cache = {}
+
 def co3d_dataloaders(batch_size, num_workers, pin_memory, DDP_mode=True, **kwargs):
     from hydra import initialize, compose
+    
+    # Create a cache key based on the parameters that affect dataloader creation
+    cache_key = (batch_size, num_workers, pin_memory, DDP_mode, tuple(sorted(kwargs.items())))
+    
+    # Return cached dataloaders if they exist
+    if cache_key in _co3d_dataloaders_cache:
+        logger.info("Returning cached co3d dataloaders")
+        return _co3d_dataloaders_cache[cache_key]
 
+    logger.info("Creating new co3d dataloaders")
+    
     if not DDP_mode:
         os.environ["LOCAL_RANK"] = "0"  # Set LOCAL_RANK to 0 for non-DDP mode
         os.environ["RANK"] = "0"        # Set RANK to 0 for non-DDP mode
@@ -64,7 +77,16 @@ def co3d_dataloaders(batch_size, num_workers, pin_memory, DDP_mode=True, **kwarg
     dataloaders["train"] = trainer.train_dataset.get_loader(0)  # Get the loader for epoch 0
     dataloaders["val"] = trainer.val_dataset.get_loader(0)      # Get the loader for epoch 0
 
+    # Cache the dataloaders
+    _co3d_dataloaders_cache[cache_key] = dataloaders
+    
     return dataloaders
+
+def clear_co3d_dataloaders_cache():
+    """Clear the cached co3d dataloaders. Useful when you need to force recreation."""
+    global _co3d_dataloaders_cache
+    _co3d_dataloaders_cache.clear()
+    logger.info("Cleared co3d dataloaders cache")
 
 def setup_dataloader(name, batch_size, nworkers, pin_memory, DDP_mode, model):
     if name == "imagenet":
