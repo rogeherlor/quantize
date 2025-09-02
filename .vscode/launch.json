@@ -9,7 +9,7 @@
             "type": "debugpy",
             "request": "launch",
             "program": "main.py",
-            "args": ["--mode", "STATS", // "STATS" "QAT"
+            "args": ["--mode", "QAT", // "STATS" "QAT"
                     "--num_bits", "2",
                     "--lr", "0.1",
                     "--weight_decay", "1e-4",
@@ -25,4 +25,4 @@
 }
 
 // python main.py --mode QAT --num_bits 16 --lr 0.1 --weight_decay 1e-4 --x_quantizer LSQ_quantizer --w_quantizer LSQ_quantizer --initializer LSQ_initializer
-// python src/models/depth/vggt/evaluation/test_co3d.py --model_path /home/rogelio/quantize/model_zoo/vggt/vggt_1B_commercial.pt --co3d_dir /data3/rogelio/co3d/dataset/ --co3d_anno_dir /data3/rogelio/co3d/preprocessed_dataset/ --seed 0
+// python src/models/depth/vggt/evaluation/test_co3d.py --model_path /home/rogelio/quantize/model_zoo/vggt/vggt_1B_commercial.pt --co3d_dir data3/rogelio/co3d/dataset/ --co3d_anno_dir /data3/rogelio/co3d/preprocessed_dataset/ --seed 0

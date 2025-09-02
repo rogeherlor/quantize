@@ -3,7 +3,6 @@ import time
 import shutil
 import numpy as np
 import torch
-import psutil
 import gc
 from collections import defaultdict
 import random

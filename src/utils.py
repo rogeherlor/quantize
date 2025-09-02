@@ -21,12 +21,12 @@ from src.models.depth.vggt.training.trainer import Trainer
 #========================================================================
 def imagenet_dataloaders(batch_size, num_workers, pin_memory, DDP_mode = True, model = None, mini=False):
     
-    traindir = '/data3/rogelio/imagenet/train' # 'data3/imagenet/train'
-    valdir = '/data3/rogelio/imagenet/val' # 'data3/imagenet/val'
+    traindir = 'data3/rogelio/imagenet/train' # 'data3/imagenet/train'
+    valdir = 'data3/rogelio/imagenet/val' # 'data3/imagenet/val'
     if mini:
         logger.warning("Not definitive imagenet train/val data: test/val")
-        traindir = './data/imagenet-mini/train'
-        valdir = './data/imagenet-mini/val'
+        traindir = 'data/imagenet-mini/train'
+        valdir = 'data/imagenet-mini/val'
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
     # The label of the first folder will be 0, the second will be 1, and so on.

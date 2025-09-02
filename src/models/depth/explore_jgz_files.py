@@ -30,7 +30,7 @@ def explore_jgz_files(annotation_dir, category):
     return sequences
 
 if __name__ == "__main__":
-    annotation_dir = "/data3/rogelio/co3d/co3d_anno"
+    annotation_dir = "data3/rogelio/co3d/co3d_anno"
     category = "apple"
 
     sequences = explore_jgz_files(annotation_dir, category)

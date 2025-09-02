@@ -20,7 +20,7 @@ services:
       - NCCL_P2P_DISABLE=1 # Sirius no communication between GPUs
     volumes:
       - ./:/workspace
-      - /data3/rogelio:/workspace/data3
+      # - /data3/rogelio:/workspace/data3
     stdin_open: true
     tty: true
     command: /bin/bash -c "tail -f /dev/null"
