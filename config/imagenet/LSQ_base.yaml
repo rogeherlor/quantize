@@ -1,8 +1,8 @@
 # python main.py --mode QAT --num_bits 2 --lr 0.1 --weight_decay 1e-4 --x_quantizer LSQ_quantizer --w_quantizer LSQ_quantizer --initializer LSQ_initializer
 action: load # resume
 train_id: null
-dataset_name: co3d
-model: vggt
+dataset_name: imagenet # co3d
+model: pytorchcv_preresnet18 # vggt
 nepochs: 89
 batch_size: 1
 optimizer: SGD
@@ -37,7 +37,7 @@ pre_trained: True
 evaluation_mode: False
 write_log: True
 ddp: False
-gpu_rank: 1 # Can be multiple ranks: 0,1
+gpu_rank: 0 # Can be multiple ranks: 0,1
 invisible_pgb: False
 save_path: output
 save_mode: xxxall_checkpoints

@@ -181,7 +181,6 @@ def inference(args, net, dataloader, num_batches=1, stats_collector=None):
         if batch_count >= num_batches:
             break
         
-        # Memory cleanup every few batches
         if batch_count > 0 and batch_count % 5 == 0:
             gc.collect()
             torch.cuda.empty_cache() if args.device == 'cuda' else None
@@ -232,11 +231,9 @@ def plot_comparison_histogram(original_data, quantized_data, title, bins=256):
     ax.hist(original_data, bins=bins, alpha=0.6, color='blue', label='Original', density=True)
     ax.hist(quantized_data, bins=bins, alpha=0.6, color='red', label='Quantized', density=True)
     
-    # Statistics for original
     orig_mean = np.mean(original_data)
     orig_std = np.std(original_data)
     
-    # Statistics for quantized
     quant_mean = np.mean(quantized_data)
     quant_std = np.std(quantized_data)
     
@@ -250,7 +247,6 @@ def plot_comparison_histogram(original_data, quantized_data, title, bins=256):
     ax.legend()
     ax.grid(True, linestyle='--', alpha=0.3)
     
-    # Add text with statistics
     stats_text = f'Original: μ={orig_mean:.4e}, σ={orig_std:.4e}\nQuantized: μ={quant_mean:.4e}, σ={quant_std:.4e}'
     ax.text(0.02, 0.98, stats_text, transform=ax.transAxes, verticalalignment='top',
             bbox=dict(boxstyle='round', facecolor='white', alpha=0.8), fontsize=9)
@@ -344,7 +340,6 @@ def compare_stats(original_stats, quantized_stats, writer, step=0,
                 comparison_count += 1
                 logger.debug(f"Created comparison histogram for {tensor_name}")
                 
-                # Trigger garbage collection every 10 comparisons to keep memory usage low
                 if comparison_count % 10 == 0:
                     gc.collect()
     
@@ -413,7 +408,6 @@ def run_stats(args):
     
     original_stats = collect_model_stats(args, original_net, dataloader, "original", num_inference_batches, MODULE_TYPES, LOG_TENSOR_SUFFIXES)
     
-    # Force memory cleanup before histogram generation
     gc.collect()
     
     histogram_from_stats(original_stats, writer, step=0, model_type="original", 
@@ -421,12 +415,10 @@ def run_stats(args):
                         image_suffixes=IMAGE_SUFFIXES, 
                         scalar_suffixes=SCALAR_SUFFIXES)
     
-    # Check disk space before continuing
     disk_usage = shutil.disk_usage(args.save_path)
     free_gb = disk_usage.free / (1024**3)
     logger.info(f"Disk space available: {free_gb:.2f} GB")
     
-    # Free GPU memory
     del original_net
     torch.cuda.empty_cache() if args.device == 'cuda' else None
     gc.collect()
@@ -444,7 +436,6 @@ def run_stats(args):
                         image_suffixes=IMAGE_SUFFIXES, 
                         scalar_suffixes=SCALAR_SUFFIXES)
     
-    # Create comparison histograms (this needs the sample data)
     logger.info("=" * 50)
     logger.info("CREATING COMPARISON HISTOGRAMS")
     logger.info("=" * 50)
@@ -453,7 +444,6 @@ def run_stats(args):
                  comparison_suffixes=COMPARISON_SUFFIXES, 
                  image_suffixes=IMAGE_SUFFIXES)
     
-    # Free GPU memory
     del quantized_net
     torch.cuda.empty_cache() if args.device == 'cuda' else None
     gc.collect()
@@ -461,7 +451,6 @@ def run_stats(args):
     writer.close()
     logger.info(f"Run STATS completed successfully. TensorBoard logs saved to {save_path}")
     
-    # Log final statistics
     original_final = original_stats.get_final_stats()
     quantized_final = quantized_stats.get_final_stats()
     logger.info(f"Original - Total tensors: {len(original_final)}")

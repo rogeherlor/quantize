@@ -9,13 +9,14 @@
             "type": "debugpy",
             "request": "launch",
             "program": "main.py",
-            "args": ["--mode", "QAT", // "STATS" "QAT"
-                    "--num_bits", "2",
+            "args": ["--mode", "PTQ", // "QAT" "STATS"
+                    "--num_bits", "8",
                     "--lr", "0.1",
                     "--weight_decay", "1e-4",
                     "--x_quantizer", "LSQ_quantizer", 
                     "--w_quantizer", "LSQ_quantizer", 
                     "--initializer", "LSQ_initializer",
+                    "--ptq_algorithm", "gptq",
                     "--init_from", "xxoutput/train/imagenet/pytorchcv_preresnet18/w_LSQ_initializer__x_LSQ_initializer/w_LSQ_quantizer__x_LSQ_quantizer/2bit/AdamW_for_s_SGD_for_others_LinearWarmupCosineAnnealing_lr0.1_wd0.0001_xslr0.01_wslr0.01_xswd0.1_wswd0.1_w_wo_gs_x_wo_gs_wo_shift_init_num100_from_fp_model_wo_l1_reg_for_s_wo_od_wo_wn_wo_nv_89epochs-None/ckpt.pth",
                 ],
             "console": "integratedTerminal",

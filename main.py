@@ -15,6 +15,7 @@ from src.quantizer.nonuniform import *
 from src.initializer import *
 from src.run_qat import run_qat
 from src.run_stats import run_stats
+from src.run_ptq import run_ptq
 
 if __name__ == '__main__':
     with open('./config/imagenet/LSQ_base.yaml') as file:
@@ -30,9 +31,13 @@ if __name__ == '__main__':
     logger.info(f"Device: {config.device}")
 
     parser = argparse.ArgumentParser(description='VGGT Quantization')
-    parser.add_argument('--mode', type=str, default='QAT', help='mode: QAT or PTQ')
+    parser.add_argument('--mode', type=str, default='QAT', help='mode: QAT, PTQ or STATS')
     parser.add_argument('--num_bits', type=int, help='quantization bit-width')
     parser.add_argument('--accelerator', type=str, default='GPU', help='accelerator: GPU or HAILO')
+    
+    # PTQ parameters
+    parser.add_argument('--ptq_algorithm', type=str, default='gptq', help='PTQ algorithm: gptq, minmax')
+    
     # QAT parameters
     parser.add_argument('--lr', default=0.1, type=float, metavar='N', help='learning rate')
     parser.add_argument('--coeff_qparm_lr', default=0.1, type=float, metavar='N', help='qparm learning rate = coeff*lr')
@@ -78,6 +83,9 @@ if __name__ == '__main__':
     config.train_id = args.train_id
     config.first_run = args.first_run
     config.init_from = args.init_from if args.init_from != None else None
+    
+    # PTQ specific config
+    config.ptq_algorithm = args.ptq_algorithm
 
     if config.different_optimizer_mode == False:
         logger.info("reset Qparm hyper parameters to be same as other parameters' ones")
@@ -103,7 +111,13 @@ if __name__ == '__main__':
         logger.info("QAT finished")
     elif args.mode == 'PTQ':
         logger.info("Start PTQ at the following setting")
-        logger.warning("PTQ is not implemented yet")
+        logger.info(
+            f"ptq_algorithm: {config.ptq_algorithm}, num_bits: {config.num_bits}, "
+            f"x_quantizer: {config.x_quantizer}, w_quantizer: {config.w_quantizer}, "
+            f"x_initializer: {config.x_initializer}, w_initializer: {config.w_initializer}"
+        )
+        run_ptq(config)
+        logger.info("PTQ finished")
     elif args.mode == 'STATS':
         logger.info("Start STATS at the following setting")
         run_stats(config)
