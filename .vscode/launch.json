@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "main.py",
             "args": ["--mode", "PTQ", // "QAT" "STATS"
-                    "--num_bits", "8",
+                    "--num_bits", "4",
                     "--lr", "0.1",
                     "--weight_decay", "1e-4",
                     "--x_quantizer", "LSQ_quantizer", 

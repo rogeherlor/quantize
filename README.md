@@ -2,16 +2,14 @@ Dudas:
 Batchnorm2d? Se integra con la capa quantizada (folded) durante la inferencia? Hailo lo hace pero aqui que pasa?
 
 Pasos:
-Entrenar 2 bits
-Mirar stats 2 bits
-Stats VGGT
-PQ resnet
-1.
-Empezar a mirar PTQ
-Definir posibilidades de configuracion
-Registrar de otra forma los parametros en vez de register_buffer porque solo se queda el ultimo batch y es memory intensive para la gpu. Hacerlo como una lista self.saved_outpus = {"x": [], "yq": [], ...}. Probar module.register_forward_hook
-3.
-Ver como hacer modelo entero int
+Entender bien GPTQ. Ver como poder tocar mas facilmente que capas hacer y su configuracion.
+Mirar ZeroQuant-V2 y original
+Mirar Outlier Suppression / Outlier Suppression+ (Park et al., 2023)
+
+Sacar resultados con PTQ. Hacer tabla
+Pasar a nuestro LSQ_quantizer formato. Estudiar si penaliza mucho que siempre sea symmetric
+Intentar fine-tuning
+Ver si fine tune a la vez o hacer lo de capa por capa viendo alguna metrica para saber cual hacer
 
 ToDo:
 Sustituir run_test de qat por STATS

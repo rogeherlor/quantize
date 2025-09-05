@@ -36,7 +36,7 @@ if __name__ == '__main__':
     parser.add_argument('--accelerator', type=str, default='GPU', help='accelerator: GPU or HAILO')
     
     # PTQ parameters
-    parser.add_argument('--ptq_algorithm', type=str, default='gptq', help='PTQ algorithm: gptq, minmax')
+    parser.add_argument('--ptq_algorithm', type=str, default='gptq', help='PTQ algorithm: gptq, rtn')
     
     # QAT parameters
     parser.add_argument('--lr', default=0.1, type=float, metavar='N', help='learning rate')

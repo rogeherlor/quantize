@@ -7,8 +7,8 @@ from src.logger import logger
 from src.make_ex_name import make_ex_name
 
 from src.models.model import create_model
-from src.ptq.gptq.gptq_quantize import run_gptq_quantization
-from src.ptq.minmax.minmax import run_minmax_quantization
+from src.ptq.gptq.run_gptq import run_gptq_quantization
+from src.ptq.rtn.rtn import run_rtn_quantization
 
 PTQ_CONFIG = {
     'gptq': dotdict({
@@ -20,8 +20,11 @@ PTQ_CONFIG = {
         'calibration_samples': 256,
         'replace_with_qmodules': True
     }),
-    'minmax': dotdict({
-        'calibration_samples': 1000
+    'rtn': dotdict({
+        'calibration_samples': 1000,
+        'rtn_scale_method': 'symmetric_max',  # minmax, symmetric_max, mse, percentile
+        'rtn_percentile': 99.99,  # Used when rtn_scale_method='percentile'
+        'rtn_symmetric': True
     })
 }
 
@@ -59,8 +62,8 @@ def run_ptq(args):
         logger.info(f"  - GPTQ activation order: {args.gptq_actorder}")
         logger.info(f"  - Replace with Q-modules: {args.replace_with_qmodules}")
         qmodel = run_gptq_quantization(args)
-    elif ptq_algorithm == 'minmax':
-        qmodel = run_minmax_quantization(args)
+    elif ptq_algorithm == 'rtn':
+        qmodel = run_rtn_quantization(args)
 
     logger.info("Saving quantized model...")
     save_quantized_model(qmodel, args)
