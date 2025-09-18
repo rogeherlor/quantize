@@ -12,13 +12,16 @@ from src.ptq.rtn.rtn import run_rtn_quantization
 
 PTQ_CONFIG = {
     'gptq': dotdict({
+        'skip_layers': ['point_head', 'track_head', 'depth_head'],
         'gptq_blocksize': 128,
-        'gptq_percdamp': 0.01,
+        'mse': True,
+        'gptq_percdamp': 0.01,  # 0.01,
         'gptq_groupsize': -1,
         'gptq_actorder': False,
         'gptq_static_groups': False,
-        'calibration_samples': 256,
-        'replace_with_qmodules': True
+        'calibration_samples': 2000,  # 10000,
+        'replace_with_qmodules': True,
+        'output_path': './data3/rogelio/model_zoo/vggt/'
     }),
     'rtn': dotdict({
         'calibration_samples': 1000,

@@ -1,4 +1,5 @@
 import os
+import subprocess
 from src.logger import logger
 
 import torch
@@ -12,6 +13,17 @@ from src.models.depth.vggt.training.trainer import Trainer
 from src.utils import replace_module, stepsize_init, split_params, Multiple_Loss, Multiple_optimizer_scheduler
 from src.scheduler_optimizer_class import scheduler_optimizer_class
 import src.module_quantization as Q
+
+def run_evaluation_vggt(model_path):
+    gptq_eval_cmd = f"python src/models/depth/vggt/evaluation/test_co3d.py --model_path {model_path} --co3d_dir data3/rogelio/co3d/dataset/ --co3d_anno_dir data3/rogelio/co3d/preprocessed_dataset/ --seed 0"
+    logger.info(f"Running: {gptq_eval_cmd}")
+
+    gptq_result = subprocess.run(gptq_eval_cmd, shell=True, capture_output=True, text=True, cwd="/home/rogelio/quantize")
+    logger.info(f"GPTQ Evaluation Output:\n{gptq_result.stdout}")
+    if gptq_result.stderr:
+        logger.error(f"GPTQ Evaluation Error:\n{gptq_result.stderr}")
+    if gptq_result.returncode != 0:
+        logger.error(f"GPTQ Evaluation failed with return code: {gptq_result.returncode}")
 
 def run_test_vggt(args):
     logger.info(f"==> Preparing testing for {args.dataset_name}..")

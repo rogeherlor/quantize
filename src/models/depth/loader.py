@@ -4,10 +4,8 @@
 """
 
 import os
+import torch
 from src.models.depth.vggt.vggt.models.vggt import VGGT
-
-def get_vggt(model_name=False, pretrained=False, **kwargs):
-    pass
 
 def vggt(pretrained=False, **kwargs):
     """
@@ -18,16 +16,12 @@ def vggt(pretrained=False, **kwargs):
         Whether to load the pretrained weights for model.
     """
     if pretrained:
-        # Get absolute path to the model file
         current_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
-        model_path = os.path.join(project_root, "model_zoo", "vggt", "vggt_1B_commercial.pt")
-        
-        # Create model instance
+        model_path = os.path.join(project_root, "data3", "rogelio", "model_zoo", "vggt", "vggt_1B_commercial.pt")
+
         net = VGGT(**kwargs)
         
-        # Load state dict from local .pt file
-        import torch
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         state_dict = torch.load(model_path, map_location=device)
         net.load_state_dict(state_dict)

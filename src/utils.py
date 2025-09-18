@@ -210,7 +210,6 @@ def replace_all(model, replacement_dict={}):
                     new_layer = new_layer.to(ref.device, dtype=ref.dtype)
                 new_layer.train(m.training)
                 
-                # Share parameters. If copy will duplicate in GPU memory.
                 new_layer.weight = m.weight
                 if m.bias is not None:
                     new_layer.bias = m.bias
