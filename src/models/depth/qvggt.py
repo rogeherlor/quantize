@@ -1,17 +1,31 @@
 import os
+import subprocess
 from src.logger import logger
 
 import torch
 import torch.nn as nn
+from torch.utils.tensorboard import SummaryWriter
 from functools import partial
 
 from hydra import initialize, compose
 import src.models.depth.vggt.vggt
 from src.models.depth.vggt.training.trainer import Trainer
 
-from src.utils import replace_module, stepsize_init, split_params, Multiple_Loss, Multiple_optimizer_scheduler
+from src.utils import *
 from src.scheduler_optimizer_class import scheduler_optimizer_class
 import src.module_quantization as Q
+from src.make_ex_name import *
+
+def run_evaluation_vggt(model_path):
+    gptq_eval_cmd = f"python src/models/depth/vggt/evaluation/test_co3d.py --model_path {model_path} --co3d_dir data3/rogelio/co3d/dataset/ --co3d_anno_dir data3/rogelio/co3d/preprocessed_dataset/ --seed 0"
+    logger.info(f"Running: {gptq_eval_cmd}")
+
+    gptq_result = subprocess.run(gptq_eval_cmd, shell=True, capture_output=True, text=True, cwd="/home/rogelio/quantize")
+    logger.info(f"GPTQ Evaluation Output:\n{gptq_result.stdout}")
+    if gptq_result.stderr:
+        logger.error(f"GPTQ Evaluation Error:\n{gptq_result.stderr}")
+    if gptq_result.returncode != 0:
+        logger.error(f"GPTQ Evaluation failed with return code: {gptq_result.returncode}")
 
 def run_test_vggt(args):
     logger.info(f"==> Preparing testing for {args.dataset_name}..")
@@ -81,32 +95,23 @@ def run_train_vggt(rank, args):
     trainer = Trainer(**cfg)
     trainer.model.module = replace(args, trainer.model.module)
 
+    # run_load_model equivalent
     if args.action == 'load':
-        stepsize_init(trainer.model.module, trainer.train_dataset.get_loader(0), args.device, num_batches=1, dataset_name=args.dataset_name) #args.init_num
+        stepsize_init(trainer.model.module, trainer.train_dataset.get_loader(0), args.device, num_batches=args.init_num, dataset_name=args.dataset_name)
+
+    if args.different_optimizer_mode:
+        sparams, params = split_params(\
+            trainer.model.module, weight_decay=args.weight_decay, lr = args.lr, x_lr= args.x_step_size_lr, \
+                w_lr= args.w_step_size_lr, x_wd = args.x_step_size_wd, w_wd = args.w_step_size_wd)
     
-    # if args.different_optimizer_mode:
-    #     sparams, params = split_params(\
-    #         trainer.model.module, weight_decay=args.weight_decay, lr = args.lr, x_lr= args.x_step_size_lr, \
-    #             w_lr= args.w_step_size_lr, x_wd = args.x_step_size_wd, w_wd = args.w_step_size_wd)
-    # 
-    # optimizer, scheduler = scheduler_optimizer_class(args, params, args.optimizer)
-    # optimizer_dict = {"optimizer": optimizer}
-    # scheduler_dict = {"scheduler": scheduler}
-    # if args.different_optimizer_mode:
-    #     soptimizer, sscheduler = scheduler_optimizer_class(args, sparams, args.step_size_optimizer)
-    #     optimizer_dict["step_size_optimizer"] = soptimizer
-    #     scheduler_dict["step_size_scheduler"] = sscheduler
-    # 
-    # task_loss_fn = nn.CrossEntropyLoss()
-    # loss_dict = {"task_loss": task_loss_fn}
-    # 
-    # criterion = Multiple_Loss(loss_dict)
-    # all_optimizers = Multiple_optimizer_scheduler(optimizer_dict)
-    # all_schedulers = Multiple_optimizer_scheduler(scheduler_dict)
-    
-    # val_accuracy, val_top5_accuracy,  total_val_loss, best_acc, val_loss_dict = run_one_epoch(net, dataloader, all_optimizers, criterion, 0, "val", best_acc, args, ddp_initialized)
+    # setup optimizer & scheduler for scale
+    if args.different_optimizer_mode:
+        soptimizer, sscheduler = scheduler_optimizer_class(args, sparams, args.step_size_optimizer)
+        optimizer_dict = {"step_size_optimizer": soptimizer}
+        scheduler_dict = {"step_size_scheduler": sscheduler}
+
+    # Train mode
     trainer.model.module.train()
     torch.set_grad_enabled(True)
 
-    # Modify training so scale is trained
-    trainer.run_train()
+    trainer.run_train(s_optimizer=optimizer_dict, s_scheduler=scheduler_dict)

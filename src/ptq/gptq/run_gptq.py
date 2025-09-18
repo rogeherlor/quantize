@@ -1,3 +1,6 @@
+import os
+import gc
+
 import torch
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
@@ -9,6 +12,7 @@ from src.utils import *
 from src.models.model import create_model
 from src.module_quantization import QLinear, QConv2d
 from src.run_qat import run_load_model, run_one_epoch
+from src.models.depth.qvggt import run_evaluation_vggt
 
 from .gptq import GPTQ
 from .quant import Quantizer
@@ -17,203 +21,258 @@ def find_layers(module, layers=None):
     """Find all Linear and Conv2d layers in a module."""
     if layers is None:
         layers = [nn.Linear, nn.Conv2d]
-    
     if type(module) in layers:
         return {None: module}
-    
     res = {}
     for name, child in module.named_children():
-        res.update({name + '.' + k if k else name: v for k, v in find_layers(child, layers).items()})
-    
+        child_layers = find_layers(child, layers)
+        for k, v in child_layers.items():
+            full_name = name + '.' + k if k else name
+            res[full_name] = v
     return res
 
-
-def quantize_layer_with_gptq(layer, dataloader, args, num_samples=None):
-    """
-    Quantize a single layer using GPTQ algorithm integrated with your quantization framework.
-    """
-    if num_samples is None:
-        num_samples = args.calibration_samples  # Clean dotdict access
-    
-    logger.info(f"Quantizing layer: {layer.__class__.__name__} with {num_samples} samples")
-    
-    # Create GPTQ instance for this layer
-    gptq = GPTQ(layer)
-    
-    # Use the Quantizer from quant.py
-    quantizer = Quantizer()
-    quantizer.configure(
-        bits=args.num_bits,
-        perchannel=False,  # You can modify this based on your needs
-        sym=True,          # Symmetric quantization
-        mse=False,         # You can enable MSE optimization if needed
-        maxshrink=0.8
-    )
-    
-    # Set up the quantizer
-    gptq.quantizer = quantizer
-    
-    # Collect statistics by running forward passes
-    layer.eval()
-    sample_count = 0
-    
-    with torch.no_grad():
-        for batch_idx, (inputs, _) in enumerate(dataloader):
-            if sample_count >= num_samples:
-                break
-                
-            inputs = inputs.to(args.device)
-            
-            # Hook to capture input and output
-            def hook_fn(module, input, output):
-                gptq.add_batch(input[0], output)
-            
-            handle = layer.register_forward_hook(hook_fn)
-            
-            try:
-                # Forward pass to collect statistics
-                _ = layer(inputs)
-                sample_count += inputs.size(0)
-            finally:
-                handle.remove()
-    
-    logger.info(f"Collected statistics from {sample_count} samples")
-    
-    # Run GPTQ quantization with clean dotdict access
-    gptq.fasterquant(
-        blocksize=args.gptq_blocksize,
-        percdamp=args.gptq_percdamp,
-        groupsize=args.gptq_groupsize,
-        actorder=args.gptq_actorder,
-        static_groups=args.gptq_static_groups
-    )
-    
-    # Clean up
-    gptq.free()
-    
-    logger.info("Layer quantization completed")
+class StopForward(Exception):
+    pass
 
 
 def quantize_model_gptq(model, dataloader, args):
     """
-    Quantize an entire model using GPTQ algorithm and extract scales.
+    GPTQ quantization using user-specified block list.
+    Each block in args.quant_blocks is processed with a Catcher and all quantizable layers inside are quantized together.
+    If a block is a ModuleList/Sequential, each submodule is processed as a separate block, one at a time (only one on GPU).
     """
-    logger.info("Starting GPTQ model quantization...")
-    
-    # Find all quantizable layers
-    layers_dict = find_layers(model)
-    logger.info(f"Found {len(layers_dict)} layers to quantize")
-    
-    # Create GPTQ instances for each layer
-    quantizers = {}
-    for layer_name, layer in layers_dict.items():
+    logger.info("Starting GPTQ block-list quantization...")
+    model.eval()
+
+    if not hasattr(args, 'quant_blocks') or not args.quant_blocks:
+        raise ValueError("You must specify args.quant_blocks as a list of block names (dotted paths) to quantize.")
+
+    logger.info(f"User-specified quantization blocks: {args.quant_blocks}")
+    scale_dict = {}
+
+    # Expand blocks if they are ModuleList/Sequential
+    expanded_blocks = []
+    for block_name in args.quant_blocks:
+        parent, leaf = _resolve_parent_and_leaf(model, block_name)
+        block_module = getattr(parent, leaf) if hasattr(parent, leaf) else parent[int(leaf)]
+        if isinstance(block_module, (nn.ModuleList, nn.Sequential)):
+            for i in range(len(block_module)):
+                expanded_blocks.append(f"{block_name}.{i}")
+        else:
+            expanded_blocks.append(block_name)
+
+    for block_idx, block_name in enumerate(expanded_blocks):
+        logger.info(f"Processing block {block_idx+1}/{len(expanded_blocks)}: {block_name}")
+        parent, leaf = _resolve_parent_and_leaf(model, block_name)
+        block_module = getattr(parent, leaf) if hasattr(parent, leaf) else parent[int(leaf)]
+        block_inputs = _collect_block_inputs_with_catcher(model, dataloader, block_name, args)
+        block_scale_dict = _process_block_with_gptq(block_module, block_inputs, block_name, args)
+        scale_dict.update(block_scale_dict)
+        if args.device == "cuda":
+            torch.cuda.empty_cache()
+        gc.collect()
+
+    logger.info(f"Block-list quantization completed. Processed {len(scale_dict)} layers")
+    return model, scale_dict
+
+
+def _resolve_parent_and_leaf(model, dotted_path):
+    """
+    Given "foo.bar.3.baz", return (parent_module, leaf_name_or_index).
+    Handles ModuleList / Sequential indices.
+    """
+    obj = model
+    parts = dotted_path.split(".")
+    for p in parts[:-1]:
+        if hasattr(obj, p):
+            obj = getattr(obj, p)
+        elif p.isdigit() and isinstance(obj, (nn.ModuleList, nn.Sequential)):
+            obj = obj[int(p)]
+        else:
+            raise AttributeError(f"Cannot resolve '{p}' in '{dotted_path}'")
+    return obj, parts[-1]
+
+
+def _set_child(parent, leaf, value):
+    if hasattr(parent, leaf):
+        setattr(parent, leaf, value)
+    elif leaf.isdigit() and isinstance(parent, (nn.ModuleList, nn.Sequential)):
+        parent[int(leaf)] = value
+    else:
+        raise AttributeError(f"Cannot set '{leaf}' on {parent}")
+
+
+def _collect_block_inputs_with_catcher(model, dataloader, block_name, args):
+    """
+    Collect (*args, **kwargs) for a specific block using Catcher.
+    Handles ModuleList/Sequential by attaching Catcher to each submodule.
+    Returns a dict: {subblock_name: [inputs,...]} if block is a list, else just [inputs,...]
+    """
+    block_inputs = {}
+
+    class Catcher(nn.Module):
+        def __init__(self, module, inputs_list):
+            super().__init__()
+            self.module = module
+            self.inputs_list = inputs_list
+
+        def forward(self, *args, **kwargs):
+            def _cpu_detach(obj):
+                if torch.is_tensor(obj):
+                    return obj.detach().cpu()
+                if isinstance(obj, (list, tuple)):
+                    return type(obj)(_cpu_detach(x) for x in obj)
+                if isinstance(obj, dict):
+                    return {k: _cpu_detach(v) for k, v in obj.items()}
+                return obj
+            self.inputs_list.append((_cpu_detach(args), _cpu_detach(kwargs)))
+            raise StopForward
+        def __getattr__(self, name):
+            if name == "module":
+                return super().__getattr__(name)
+            return getattr(self.module, name)
+        def __getitem__(self, idx):
+            return self.module[idx]
+        def __dir__(self):
+            return list(set(super().__dir__()) | set(dir(self.module)))
+
+    parent, leaf = _resolve_parent_and_leaf(model, block_name)
+    orig_module = getattr(parent, leaf) if hasattr(parent, leaf) else parent[int(leaf)]
+
+    # Handle ModuleList/Sequential
+    if isinstance(orig_module, (nn.ModuleList, nn.Sequential)):
+        catchers = []
+        orig_submodules = []
+        for i, submodule in enumerate(orig_module):
+            subblock_name = f"{block_name}.{i}"
+            block_inputs[subblock_name] = []
+            catcher = Catcher(submodule, block_inputs[subblock_name])
+            orig_submodules.append(submodule)
+            orig_module[i] = catcher
+            catchers.append((i, catcher))
+    else:
+        block_inputs = []
+        catcher = Catcher(orig_module, block_inputs)
+        _set_child(parent, leaf, catcher)
+
+    model = model.to(args.device)
+    sample_count = 0
+    with torch.no_grad():
+        for batch in dataloader:
+            if sample_count >= args.calibration_samples:
+                break
+            try:
+                if args.dataset_name in ["imagenet", "imagenet-mini"]:
+                    inputs, _ = batch
+                    sample_count += inputs.size(0)
+                    model(inputs.to(args.device))
+                elif args.dataset_name == "co3d":
+                    from src.models.depth.vggt.training.train_utils.general import copy_data_to_device
+                    batch = copy_data_to_device(batch, args.device, non_blocking=True)
+                    sample_count += batch["images"].size(0)
+                    model(images=batch["images"])
+            except StopForward:
+                pass
+
+    # Restore original modules
+    if isinstance(orig_module, (nn.ModuleList, nn.Sequential)):
+        for i, submodule in enumerate(orig_submodules):
+            orig_module[i] = submodule
+    else:
+        _set_child(parent, leaf, orig_module)
+    model = model.cpu()
+    if args.device == "cuda":
+        torch.cuda.empty_cache()
+
+    if isinstance(orig_module, (nn.ModuleList, nn.Sequential)):
+        logger.info(f"Collected input batches for submodules: {list(block_inputs.keys())}")
+        return block_inputs
+    else:
+        logger.info(f"Collected {len(block_inputs)} input batches for block {block_name}")
+        return block_inputs
+
+
+def _process_block_with_gptq(block_module, block_inputs, block_name, args):
+    """
+    Process a single block with GPTQ quantization.
+    Handles ModuleList/Sequential by processing each submodule separately if needed.
+    """
+    scale_dict = {}
+    if isinstance(block_inputs, dict):
+        # block_module is ModuleList/Sequential
+        for i, sub_inputs in block_inputs.items():
+            submodule = block_module[int(i.split('.')[-1])]
+            sub_name = i
+            sub_scale_dict = _process_block_with_gptq(submodule, sub_inputs, sub_name, args)
+            scale_dict.update(sub_scale_dict)
+        return scale_dict
+    block_module = block_module.to(args.device)
+    full_layers = find_layers(block_module)
+    if not full_layers:
+        logger.info(f"No quantizable layers in block {block_name}")
+        block_module = block_module.cpu()
+        return {}
+    logger.info(f"Found {len(full_layers)} quantizable layers in {block_name}")
+    gptq_instances = {}
+    for name, layer in full_layers.items():
         quantizer = Quantizer()
         quantizer.configure(
-            bits=args.num_bits,
+            bits=getattr(args, "num_bits", 8),
             perchannel=False,
             sym=True,
-            mse=False,
-            maxshrink=0.8
+            mse=getattr(args, "mse", False),
+            maxshrink=0.8,
         )
-        
-        quantizers[layer_name] = GPTQ(layer)
-        quantizers[layer_name].quantizer = quantizer
-    
-    # Register hooks to collect statistics
-    def add_batch_hook(name):
-        def hook(module, input, output):
-            if len(input) > 0 and input[0] is not None:
-                quantizers[name].add_batch(input[0], output)
-        return hook
-    
-    hooks = []
-    for layer_name in quantizers.keys():
-        layer = layers_dict[layer_name]
-        hook = layer.register_forward_hook(add_batch_hook(layer_name))
-        hooks.append(hook)
-    
-    # Collect statistics
-    model.eval()
-    sample_count = 0
-    calibration_samples = args.calibration_samples
-    logger.info(f"Collecting statistics from {calibration_samples} samples...")
-    
+        gptq = GPTQ(layer)
+        gptq.quantizer = quantizer
+        gptq_instances[name] = gptq
+    def add_batch(name):
+        def hook_fn(module, inp, out):
+            x = inp[0] if isinstance(inp, (list, tuple)) else inp
+            if torch.is_tensor(x):
+                gptq_instances[name].add_batch(x.data, out.data)
+        return hook_fn
+    handles = [layer.register_forward_hook(add_batch(name))
+               for name, layer in full_layers.items()]
+    def _to_device(obj, device):
+        if torch.is_tensor(obj):
+            return obj.to(device)
+        if isinstance(obj, (list, tuple)):
+            return type(obj)(_to_device(x, device) for x in obj)
+        if isinstance(obj, dict):
+            return {k: _to_device(v, device) for k, v in obj.items()}
+        return obj
     with torch.no_grad():
-        for batch_idx, (inputs, _) in enumerate(dataloader):
-            if sample_count >= calibration_samples:
-                break
-            
-            inputs = inputs.to(args.device)
-            _ = model(inputs)
-            sample_count += inputs.size(0)
-            
-            if batch_idx % 10 == 0:
-                logger.info(f"Processed {sample_count}/{calibration_samples} samples")
-    
-    # Remove hooks
-    for hook in hooks:
-        hook.remove()
-    
-    logger.info(f"Collected statistics from {sample_count} samples")
-    
-    # Quantize each layer and extract scales
-    scale_dict = {}
-    for layer_name, gptq_instance in quantizers.items():
-        logger.info(f"Quantizing layer: {layer_name}")
-        
-        # If no samples collected, use simple RTN (minmax)
-        if gptq_instance.nsamples == 0:
-            logger.warning(f"No samples for layer {layer_name}, using RTN quantization")
-            W = gptq_instance.layer.weight.data
-            if isinstance(gptq_instance.layer, nn.Conv2d):
-                W = W.flatten(1)
-            
-            w_max = torch.max(torch.abs(W.min()), torch.abs(W.max()))
-            qmax = 2 ** (args.num_bits - 1) - 1
-            scale = w_max / qmax
-            if scale > 0:
-                scale_dict[layer_name] = scale
-                logger.info(f"RTN scale for {layer_name}: {scale.item():.6f}")
-            continue
-        
-        # Run GPTQ quantization
-        gptq_instance.fasterquant(
-            blocksize=args.gptq_blocksize,
-            percdamp=args.gptq_percdamp,
-            groupsize=args.gptq_groupsize,
-            actorder=args.gptq_actorder,
-            static_groups=args.gptq_static_groups
-        )
-        
-        # Extract scale
-        if hasattr(gptq_instance.quantizer, 'scale') and gptq_instance.quantizer.scale is not None:
-            scale_value = gptq_instance.quantizer.scale.clone()
-            if torch.all(scale_value > 0) and torch.isfinite(scale_value).all():
-                if scale_value.numel() == 1:
-                    scale_dict[layer_name] = scale_value
-                    logger.info(f"Extracted scale for {layer_name}: {scale_value.item():.6f}")
-                else:
-                    # Take first element if all are the same, otherwise use mean
-                    unique_vals = torch.unique(scale_value)
-                    if len(unique_vals) == 1:
-                        scale_dict[layer_name] = unique_vals[0:1]
-                        logger.info(f"Extracted uniform scale for {layer_name}: {unique_vals[0].item():.6f}")
-                    else:
-                        mean_scale = scale_value.mean().unsqueeze(0)
-                        scale_dict[layer_name] = mean_scale
-                        logger.info(f"Extracted mean scale for {layer_name}: {mean_scale.item():.6f}")
-            else:
-                logger.warning(f"Invalid scale for {layer_name}: {scale_value}")
-        else:
-            logger.warning(f"No scale available for layer {layer_name}")
-        
-        gptq_instance.free()
-    
-    logger.info("GPTQ model quantization completed")
-    return model, scale_dict, quantizers
+        for args_in, kwargs_in in block_inputs:
+            args_in = _to_device(args_in, args.device)
+            kwargs_in = _to_device(kwargs_in, args.device)
+            block_module(*args_in, **kwargs_in)
+    for h in handles:
+        h.remove()
+    for name, gptq in gptq_instances.items():
+        if gptq.nsamples > 0:
+            gptq.fasterquant(
+                blocksize=getattr(args, "gptq_blocksize", 128),
+                percdamp=getattr(args, "gptq_percdamp", 0.01),
+                groupsize=getattr(args, "gptq_groupsize", -1),
+                actorder=getattr(args, "gptq_actorder", False),
+                static_groups=getattr(args, "gptq_static_groups", False),
+            )
+            full_name = f"{block_name}.{name}" if name else block_name
+            scale = getattr(gptq.quantizer, "scale", None)
+            if scale is not None:
+                scale_value = scale.clone().cpu()
+                if torch.all(scale_value > 0) and torch.isfinite(scale_value).all():
+                    scale_dict[full_name] = (
+                        scale_value.mean().unsqueeze(0)
+                        if scale_value.numel() > 1 else scale_value
+                    )
+                    logger.info(f"Extracted scale for {full_name}")
+            gptq.free()
+    block_module = block_module.cpu()
+    return scale_dict
 
-
-def transfer_gptq_scales_to_lsq(quantized_net, scale_dict, quantizers, args):
+def transfer_gptq_scales_to_lsq(quantized_net, scale_dict, args):
     """
     Transfer GPTQ scales to LSQ quantizers.
     Simple 1:1 scale transfer since both use symmetric quantization.
@@ -271,12 +330,11 @@ def transfer_gptq_scales_to_lsq(quantized_net, scale_dict, quantizers, args):
     return quantized_net
 
 
-
 def run_gptq_quantization(args):
-    logger.info("Starting GPTQ quantization pipeline...")
+    logger.info("Starting GPTQ...")
+    args.x_quantizer = None
     
-    pin_memory = True if args.device == 'cuda' else False
-    dataloader = setup_dataloader(args.dataset_name, args.batch_size, args.nworkers, pin_memory=pin_memory, DDP_mode=False, model=args.model)
+    dataloader = setup_dataloader(args.dataset_name, args.batch_size, args.nworkers, pin_memory=False, DDP_mode=False, model=args.model)
 
     calibration_loader = dataloader["train"]
 
@@ -286,62 +344,67 @@ def run_gptq_quantization(args):
     original_net.eval()
 
     cudnn.benchmark = True if args.device == 'cuda' else False
-    task_loss_fn = nn.CrossEntropyLoss()
-    criterion_val = Multiple_Loss( {"task_loss": task_loss_fn})
-    
-    # Create a copy of the original model for GPTQ quantization
-    logger.info("Creating copy of original model for GPTQ...")
-    import copy
-    gptq_model = copy.deepcopy(original_net)
-    gptq_model.eval()
 
-    logger.info("Creating quantized model structure with LSQ quantizers...")
-    # Store original x_quantizer and temporarily set to None for PTQ
-    original_x_quantizer = args.x_quantizer
-    args.x_quantizer = None  # Disable activation quantization for PTQ
+    logger.info("Running GPTQ to extract optimal scales...")
+    gptq_model, scale_dict = quantize_model_gptq(original_net, calibration_loader, args)
+
+    gptq_model_path = os.path.join(args.output_path, "gptq_model.pt")
+    os.makedirs(os.path.dirname(gptq_model_path), exist_ok=True)
+    torch.save(gptq_model.state_dict(), gptq_model_path)
+    logger.info(f"Saved GPTQ model to {gptq_model_path}")
+
+    if args.dataset_name in ['imagenet', 'imagenet-mini']:
+        task_loss_fn = nn.CrossEntropyLoss()
+        criterion_val = Multiple_Loss( {"task_loss": task_loss_fn})
+
+        logger.info("Evaluating quantized model after GPTQ (before scale transfer)...")
+        val_accuracy_gptq, val_top5_accuracy_gptq, val_loss_gptq, best_acc_gptq, val_loss_dict_gptq = run_one_epoch(gptq_model, dataloader, None, criterion_val, 0, "val", 0, args, ddp_initialized=False)
+        logger.info(f'[GPTQ] val_Loss: {val_loss_dict_gptq["task_loss"].item():.5f}, val_top1_Acc: {val_accuracy_gptq:.5f}, val_top5_Acc: {val_top5_accuracy_gptq:.5f}')
+
+    elif args.dataset_name == 'co3d':
+        logger.info("Evaluating GPTQ model using CO3D evaluation script...")
+        run_evaluation_vggt(gptq_model_path)
     
+    del gptq_model
+    gc.collect()
+    if args.device == 'cuda':
+        torch.cuda.empty_cache()
+
+    logger.info("Transferring GPTQ scales to LSQ quantizers...")
     quantized_net = run_load_model(args)
     quantized_net.eval()
-    
-    # Restore original x_quantizer in args
-    args.x_quantizer = original_x_quantizer
+    quantized_net = transfer_gptq_scales_to_lsq(quantized_net, scale_dict, args)
 
-    # Run GPTQ to get scales (this will modify gptq_model in-place)
-    logger.info("Running GPTQ to extract optimal scales...")
-    gptq_model, scale_dict, quantizers = quantize_model_gptq(gptq_model, calibration_loader, args)
+    lsq_model_path = os.path.join(args.output_path, "lsq_gptq_model.pt")
+    torch.save(quantized_net.state_dict(), lsq_model_path)
+    logger.info(f"Saved LSQ quantized model to {lsq_model_path}")
 
-    # Evaluate the GPTQ-quantized model
-    logger.info("Evaluating GPTQ-quantized model...")
-    val_accuracy_gptq, val_top5_accuracy_gptq, val_loss_gptq, best_acc_gptq, val_loss_dict_gptq = run_one_epoch(gptq_model, dataloader, None, criterion_val, 0, "val", 0, args, ddp_initialized=False)
-    logger.info(f'[GPTQ] val_Loss: {val_loss_dict_gptq["task_loss"].item():.5f}, val_top1_Acc: {val_accuracy_gptq:.5f}, val_top5_Acc: {val_top5_accuracy_gptq:.5f}')
+    if args.dataset_name in ['imagenet', 'imagenet-mini']:
+        logger.info("Evaluating final LSQ quantized model...")
+        val_accuracy_lsq, val_top5_accuracy_lsq, val_loss_lsq, best_acc_lsq, val_loss_dict_lsq = run_one_epoch(quantized_net, dataloader, None, criterion_val, 0, "val", 0, args, ddp_initialized=False)
+        logger.info(f'[LSQ] val_Loss: {val_loss_dict_lsq["task_loss"].item():.5f}, val_top1_Acc: {val_accuracy_lsq:.5f}, val_top5_Acc: {val_top5_accuracy_lsq:.5f}')
+        
+        logger.info("Evaluating original FP32 model...")
+        original_net = create_model(args)
+        original_net = original_net.to(args.device)
+        original_net.eval()
+        val_accuracy, val_top5_accuracy,  val_loss, best_acc, val_loss_dict = run_one_epoch(original_net, dataloader, None, criterion_val, 0, "val", 0, args, ddp_initialized=False)
+        logger.info(f'[Original FP32] val_Loss: {val_loss_dict["task_loss"].item():.5f}, val_top1_Acc: {val_accuracy:.5f}, val_top5_Acc: {val_top5_accuracy:.5f}')
 
-    # Transfer GPTQ scales to LSQ quantizers
-    logger.info("Transferring GPTQ scales to LSQ quantizers...")
-    quantized_net = transfer_gptq_scales_to_lsq(quantized_net, scale_dict, quantizers, args)
+        logger.info("="*60)
+        logger.info("QUANTIZATION RESULTS SUMMARY:")
+        logger.info("="*60)
+        logger.info(f"Original FP32:  Loss: {val_loss_dict['task_loss'].item():.5f}, Top1: {val_accuracy:.5f}, Top5: {val_top5_accuracy:.5f}")
+        logger.info(f"GPTQ:           Loss: {val_loss_dict_gptq['task_loss'].item():.5f}, Top1: {val_accuracy_gptq:.5f}, Top5: {val_top5_accuracy_gptq:.5f}")
+        logger.info(f"LSQ (final):    Loss: {val_loss_dict_lsq['task_loss'].item():.5f}, Top1: {val_accuracy_lsq:.5f}, Top5: {val_top5_accuracy_lsq:.5f}")
+        logger.info("="*60)
+        
+        gptq_drop = val_accuracy - val_accuracy_gptq
+        lsq_drop = val_accuracy - val_accuracy_lsq
+        logger.info(f"Accuracy drops: GPTQ: {gptq_drop:.5f}, LSQ: {lsq_drop:.5f}")
 
-    # Evaluate the final LSQ quantized model
-    logger.info("Evaluating final LSQ quantized model...")
-    val_accuracy_lsq, val_top5_accuracy_lsq, val_loss_lsq, best_acc_lsq, val_loss_dict_lsq = run_one_epoch(quantized_net, dataloader, None, criterion_val, 0, "val", 0, args, ddp_initialized=False)
-    logger.info(f'[LSQ] val_Loss: {val_loss_dict_lsq["task_loss"].item():.5f}, val_top1_Acc: {val_accuracy_lsq:.5f}, val_top5_Acc: {val_top5_accuracy_lsq:.5f}')
-
-    # Evaluate original FP32 model
-    logger.info("Evaluating original FP32 model...")
-    val_accuracy, val_top5_accuracy,  val_loss, best_acc, val_loss_dict = run_one_epoch(original_net, dataloader, None, criterion_val, 0, "val", 0, args, ddp_initialized=False)
-    logger.info(f'[Original FP32] val_Loss: {val_loss_dict["task_loss"].item():.5f}, val_top1_Acc: {val_accuracy:.5f}, val_top5_Acc: {val_top5_accuracy:.5f}')
-
-
-    # Summary comparison
-    logger.info("="*60)
-    logger.info("QUANTIZATION RESULTS SUMMARY:")
-    logger.info("="*60)
-    logger.info(f"Original FP32:  Loss: {val_loss_dict['task_loss'].item():.5f}, Top1: {val_accuracy:.5f}, Top5: {val_top5_accuracy:.5f}")
-    logger.info(f"GPTQ:           Loss: {val_loss_dict_gptq['task_loss'].item():.5f}, Top1: {val_accuracy_gptq:.5f}, Top5: {val_top5_accuracy_gptq:.5f}")
-    logger.info(f"LSQ (final):    Loss: {val_loss_dict_lsq['task_loss'].item():.5f}, Top1: {val_accuracy_lsq:.5f}, Top5: {val_top5_accuracy_lsq:.5f}")
-    logger.info("="*60)
-    
-    # Calculate accuracy drops
-    gptq_drop = val_accuracy - val_accuracy_gptq
-    lsq_drop = val_accuracy - val_accuracy_lsq
-    logger.info(f"Accuracy drops: GPTQ: {gptq_drop:.5f}, LSQ: {lsq_drop:.5f}")
+    elif args.dataset_name == 'co3d':
+        logger.info("Evaluating final LSQ quantized model...")
+        run_evaluation_vggt(lsq_model_path)
     
     return quantized_net

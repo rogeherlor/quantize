@@ -210,7 +210,6 @@ def replace_all(model, replacement_dict={}):
                     new_layer = new_layer.to(ref.device, dtype=ref.dtype)
                 new_layer.train(m.training)
                 
-                # Share parameters. If copy will duplicate in GPU memory.
                 new_layer.weight = m.weight
                 if m.bias is not None:
                     new_layer.bias = m.bias
@@ -291,7 +290,7 @@ def replace_module(model, replacement_dict={}, exception_dict={}, arch="pytorchc
         model.heads.head = replace_single_module(new_cls=exception_dict['__last__'], current_module=model.heads.head)
     elif arch == "vggt":
         model.aggregator.patch_embed.patch_embed.proj = replace_single_module(new_cls=exception_dict['__first__'], current_module=model.aggregator.patch_embed.patch_embed.proj)
-        pass
+        model.camera_head.pose_branch.fc2 = replace_single_module(new_cls=exception_dict['__last__'], current_module=model.camera_head.pose_branch.fc2)
 
     return model
 

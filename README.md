@@ -2,12 +2,21 @@ Dudas:
 Batchnorm2d? Se integra con la capa quantizada (folded) durante la inferencia? Hailo lo hace pero aqui que pasa?
 
 Pasos:
-Entender bien GPTQ. Ver como poder tocar mas facilmente que capas hacer y su configuracion.
-Mirar ZeroQuant-V2 y original
-Mirar Outlier Suppression / Outlier Suppression+ (Park et al., 2023)
 
-Sacar resultados con PTQ. Hacer tabla
-Pasar a nuestro LSQ_quantizer formato. Estudiar si penaliza mucho que siempre sea symmetric
+
+Entrenar:
+    Pasar GPTQ a LSQ
+    Entrenar
+
+PTQ:
+    Comprobar GPTQ y ver que funciona igual la transferencia a nuestra clasee LSQ_Quantize
+    Mirar Outlier Suppression / Outlier Suppression+ (Park et al., 2023)
+    GPTQ + SmoothQuant is the state of the art?
+
+Distill:
+    ZeroQuant-V2 y original
+
+Comprobar pasar a nuestro LSQ_quantizer formato funciona bien. Estudiar si penaliza mucho que siempre sea symmetric
 Intentar fine-tuning
 Ver si fine tune a la vez o hacer lo de capa por capa viendo alguna metrica para saber cual hacer
 
