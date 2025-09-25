@@ -9,17 +9,21 @@ import os
 import torch.nn as nn
 from torchvision.models import vit_b_16, ViT_B_16_Weights
 
+import timm
+
 def get_vit(model_name=False, pretrained=False, **kwargs):
     pass
 
 def vitb16(pretrained=False, **kwargs):
     """
-    ViT B 16 model from '' .
+    ViT B 16 model from 'https://huggingface.co/timm/vit_base_patch16_224.orig_in21k' .
     Parameters:
     ----------
     pretrained : bool, default False
         Whether to load the pretrained weights for model.
     """
-    weights = ViT_B_16_Weights.IMAGENET1K_V1 if pretrained else None
-    net = vit_b_16(weights=weights, progress=True)
+    # weights = ViT_B_16_Weights.IMAGENET1K_V1 if pretrained else None
+    # net = vit_b_16(weights=weights, progress=True)
+
+    net = timm.create_model('vit_base_patch16_224', pretrained=True)
     return net

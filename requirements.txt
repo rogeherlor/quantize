@@ -22,3 +22,5 @@ pycolmap == 3.10.0
 pyceres == 2.3
 ipdb == 0.13.13
 git+https://github.com/cvg/LightGlue.git
+
+timm == 1.0.20

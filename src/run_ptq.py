@@ -12,21 +12,26 @@ from src.ptq.rtn.rtn import run_rtn_quantization
 
 PTQ_CONFIG = {
     'gptq': dotdict({
-        'quant_blocks': ['aggregator.patch_embed', 
-        *[f'aggregator.frame_blocks.{i}.attn.qkv' for i in range(24)], 
-        *[f'aggregator.frame_blocks.{i}.attn.proj' for i in range(24)],
-        *[f'aggregator.frame_blocks.{i}.mlp' for i in range(24)], 
-        *[f'aggregator.global_blocks.{i}.attn.qkv' for i in range(24)],
-        *[f'aggregator.global_blocks.{i}.attn.proj' for i in range(24)],
-        *[f'aggregator.global_blocks.{i}.mlp' for i in range(24)], 
-        'camera_head.trunk.0', 'camera_head.trunk.1', 'camera_head.trunk.2', 'camera_head.trunk.3', 'camera_head.embed_pose', 'camera_head.poseLN_modulation', 'camera_head.pose_branch'],
+        **(
+            {'quant_blocks': [
+                'aggregator.patch_embed',
+                *[f'aggregator.frame_blocks.{i}.attn' for i in range(24)],
+                *[f'aggregator.frame_blocks.{i}.mlp' for i in range(24)],
+                *[f'aggregator.global_blocks.{i}.attn' for i in range(24)],
+                *[f'aggregator.global_blocks.{i}.mlp' for i in range(24)],
+                'camera_head.trunk.0', 'camera_head.trunk.1', 'camera_head.trunk.2', 'camera_head.trunk.3',
+                'camera_head.embed_pose', 'camera_head.poseLN_modulation', 'camera_head.pose_branch'
+            ]} if False else # Set this to True for VGGT
+            {'quant_blocks': ['features']} if False else # Set this to True for PreResNet18
+            {'quant_blocks': ['blocks']}  # Set this to True for ViTB16
+        ),
         'gptq_blocksize': 128,
         'mse': True,
-        'gptq_percdamp': 0.1,  # 0.01,
+        'gptq_percdamp': 0.01,  # 0.01,
         'gptq_groupsize': -1,
         'gptq_actorder': False,
         'gptq_static_groups': False,
-        'calibration_samples': 4096,  # 10000,
+        'calibration_samples': 10000, #4096,  # 10000,
         'replace_with_qmodules': True,
         'output_path': './data3/rogelio/model_zoo/vggt/'
     }),

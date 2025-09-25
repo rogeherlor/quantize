@@ -12,7 +12,7 @@ from src.utils import *
 from src.models.model import create_model
 from src.module_quantization import QLinear, QConv2d
 from src.run_qat import run_load_model, run_one_epoch
-from src.models.depth.qvggt import run_evaluation_vggt
+from src.models.depth.qvggt import run_evaluation_vggt, replace
 
 from .gptq import GPTQ
 from .quant import Quantizer
@@ -56,8 +56,16 @@ def quantize_model_gptq(model, dataloader, args):
         parent, leaf = _resolve_parent_and_leaf(model, block_name)
         block_module = getattr(parent, leaf) if hasattr(parent, leaf) else parent[int(leaf)]
         if isinstance(block_module, (nn.ModuleList, nn.Sequential)):
-            for i in range(len(block_module)):
-                expanded_blocks.append(f"{block_name}.{i}")
+            # Check if submodules have named children (not just numeric indices)
+            named_children = list(block_module.named_children())
+            if named_children and not all(name.isdigit() for name, _ in named_children):
+                # Use submodule names (e.g., 'init_block', 'stage1', etc.)
+                for name, _ in named_children:
+                    expanded_blocks.append(f"{block_name}.{name}")
+            else:
+                # Default to numeric indices
+                for i in range(len(block_module)):
+                    expanded_blocks.append(f"{block_name}.{i}")
         else:
             expanded_blocks.append(block_name)
 
@@ -142,14 +150,26 @@ def _collect_block_inputs_with_catcher(model, dataloader, block_name, args):
     # Handle ModuleList/Sequential
     if isinstance(orig_module, (nn.ModuleList, nn.Sequential)):
         catchers = []
-        orig_submodules = []
-        for i, submodule in enumerate(orig_module):
-            subblock_name = f"{block_name}.{i}"
-            block_inputs[subblock_name] = []
-            catcher = Catcher(submodule, block_inputs[subblock_name])
-            orig_submodules.append(submodule)
-            orig_module[i] = catcher
-            catchers.append((i, catcher))
+        orig_submodules = {}
+        named_children = list(orig_module.named_children())
+        if named_children and not all(name.isdigit() for name, _ in named_children):
+            # Use submodule names (e.g., 'unit1', 'unit2', etc.)
+            for name, submodule in named_children:
+                subblock_name = f"{block_name}.{name}"
+                block_inputs[subblock_name] = []
+                catcher = Catcher(submodule, block_inputs[subblock_name])
+                orig_submodules[name] = submodule
+                setattr(orig_module, name, catcher)
+                catchers.append((name, catcher))
+        else:
+            # Default to numeric indices
+            for i, submodule in enumerate(orig_module):
+                subblock_name = f"{block_name}.{i}"
+                block_inputs[subblock_name] = []
+                catcher = Catcher(submodule, block_inputs[subblock_name])
+                orig_submodules[i] = submodule
+                orig_module[i] = catcher
+                catchers.append((i, catcher))
     else:
         block_inputs = []
         catcher = Catcher(orig_module, block_inputs)
@@ -176,8 +196,13 @@ def _collect_block_inputs_with_catcher(model, dataloader, block_name, args):
 
     # Restore original modules
     if isinstance(orig_module, (nn.ModuleList, nn.Sequential)):
-        for i, submodule in enumerate(orig_submodules):
-            orig_module[i] = submodule
+        named_children = list(orig_module.named_children())
+        if named_children and not all(name.isdigit() for name, _ in named_children):
+            for name, submodule in orig_submodules.items():
+                setattr(orig_module, name, submodule)
+        else:
+            for i, submodule in orig_submodules.items():
+                orig_module[i] = submodule
     else:
         _set_child(parent, leaf, orig_module)
     model = model.cpu()
@@ -201,7 +226,14 @@ def _process_block_with_gptq(block_module, block_inputs, block_name, args):
     if isinstance(block_inputs, dict):
         # block_module is ModuleList/Sequential
         for i, sub_inputs in block_inputs.items():
-            submodule = block_module[int(i.split('.')[-1])]
+            subkey = i.split('.')[-1]
+            # Use attribute for named children, index for numeric
+            if hasattr(block_module, subkey):
+                submodule = getattr(block_module, subkey)
+            elif subkey.isdigit():
+                submodule = block_module[int(subkey)]
+            else:
+                raise AttributeError(f"Cannot resolve submodule '{subkey}' in '{block_module}'")
             sub_name = i
             sub_scale_dict = _process_block_with_gptq(submodule, sub_inputs, sub_name, args)
             scale_dict.update(sub_scale_dict)
@@ -272,66 +304,58 @@ def _process_block_with_gptq(block_module, block_inputs, block_name, args):
     block_module = block_module.cpu()
     return scale_dict
 
-def transfer_gptq_scales_to_lsq(quantized_net, scale_dict, args):
+def transfer_gptq_scales_to_lsq(quantized_net, gptq_net, scale_dict, args):
     """
-    Transfer GPTQ scales to LSQ quantizers.
-    Simple 1:1 scale transfer since both use symmetric quantization.
+    Transfer GPTQ weights and scales to LSQ quantizers.
+    For each layer name in scale_dict, find the corresponding module in quantized_net and transfer weights and scale.
     """
-    logger.info("Transferring GPTQ scales to LSQ quantizers...")
-    
-    layer_count = 0
+    logger.info("Transferring GPTQ weights and scales to LSQ quantizers...")
+
     transferred_count = 0
-    
-    logger.info(f"Available GPTQ scales for layers: {list(scale_dict.keys())}")
-    
-    for name, module in quantized_net.named_modules():
-        if hasattr(module, 'w_quantizer') and module.w_quantizer is not None:
-            layer_count += 1
-            
-            # Disable activation quantization for PTQ
-            if hasattr(module, 'x_quantizer'):
-                module.x_quantizer = None
-            
-            # Find matching GPTQ scale
-            gptq_scale = None
-            if name in scale_dict:
-                gptq_scale = scale_dict[name]
-            else:
-                # Try substring matching
-                for gptq_name, scale in scale_dict.items():
-                    if gptq_name in name or name in gptq_name:
-                        gptq_scale = scale
-                        break
-            
-            if gptq_scale is not None and hasattr(module, 'w_scale'):
-                # Transfer scale directly (GPTQ and LSQ both use symmetric quantization)
-                if not isinstance(gptq_scale, torch.Tensor):
-                    gptq_scale = torch.tensor(gptq_scale, device=module.w_scale.device)
-                else:
-                    gptq_scale = gptq_scale.to(module.w_scale.device)
-                
-                # Ensure single value for per-tensor quantization
-                if gptq_scale.numel() > 1:
-                    gptq_scale = gptq_scale.mean().unsqueeze(0)
-                
-                module.w_scale.data = gptq_scale.clone().detach().reshape_as(module.w_scale.data)
-                module.w_Qparms['scale'] = module.w_scale
-                
-                # Set initialization flag
-                if hasattr(module, 'init_state'):
-                    module.init_state = torch.tensor(True)
-                
-                transferred_count += 1
-                logger.info(f"Transferred scale {gptq_scale.item():.6f} to layer: {name}")
-            else:
-                logger.warning(f"No GPTQ scale found for layer: {name}")
-    
-    logger.info(f"Scale transfer completed: {transferred_count}/{layer_count} layers")
+    total_count = len(scale_dict)
+
+    quantized_modules = dict(quantized_net.named_modules())
+    gptq_modules = dict(gptq_net.named_modules())
+
+    for name, gptq_scale in scale_dict.items():
+        module = quantized_modules.get(name, None)
+        gptq_module = gptq_modules.get(name, None)
+        if module is None:
+            logger.warning(f"Layer {name} not found in quantized_net.")
+            continue
+        if not hasattr(module, "w_scale"):
+            logger.warning(f"Layer {name} does not have w_scale.")
+            continue
+
+        # Transfer weights if possible
+        if gptq_module is not None and hasattr(module, "weight") and hasattr(gptq_module, "weight"):
+            module.weight.data.copy_(gptq_module.weight.data)
+            if hasattr(module, "bias") and hasattr(gptq_module, "bias") and module.bias is not None and gptq_module.bias is not None:
+                module.bias.data.copy_(gptq_module.bias.data)
+
+        # Transfer scale
+        if not isinstance(gptq_scale, torch.Tensor):
+            gptq_scale = torch.tensor(gptq_scale, device=module.w_scale.device)
+        else:
+            gptq_scale = gptq_scale.to(module.w_scale.device)
+        if gptq_scale.numel() > 1:
+            gptq_scale = gptq_scale.mean().unsqueeze(0)
+        module.w_scale.data = gptq_scale.clone().detach().reshape_as(module.w_scale.data)
+        if hasattr(module, "w_Qparms"):
+            module.w_Qparms['scale'] = module.w_scale
+        if hasattr(module, "init_state"):
+            module.init_state = torch.tensor(True)
+        transferred_count += 1
+        logger.info(f"Transferred weights and scale {gptq_scale.item():.6f} to layer: {name}")
+
+    logger.info(f"Scale and weight transfer completed: {transferred_count}/{total_count} layers")
     return quantized_net
 
 
 def run_gptq_quantization(args):
     logger.info("Starting GPTQ...")
+    logger.info(f"Disabled x_quantizer for GPTQ.")
+    logger.info(f"Only LSQ w_quantizer scales and weights will be replaced. Not FP nor MinMax.")
     args.x_quantizer = None
     
     dataloader = setup_dataloader(args.dataset_name, args.batch_size, args.nworkers, pin_memory=False, DDP_mode=False, model=args.model)
@@ -349,37 +373,44 @@ def run_gptq_quantization(args):
     gptq_model, scale_dict = quantize_model_gptq(original_net, calibration_loader, args)
 
     gptq_model_path = os.path.join(args.output_path, "gptq_model.pt")
+    gptq_scales_path = os.path.join(args.output_path, "gptq_scales.pt")
     os.makedirs(os.path.dirname(gptq_model_path), exist_ok=True)
     torch.save(gptq_model.state_dict(), gptq_model_path)
-    logger.info(f"Saved GPTQ model to {gptq_model_path}")
+    torch.save(scale_dict, gptq_scales_path)
+    logger.info(f"Saved GPTQ model to {gptq_model_path} and scales to {gptq_scales_path}")
 
-    if args.dataset_name in ['imagenet', 'imagenet-mini']:
-        task_loss_fn = nn.CrossEntropyLoss()
-        criterion_val = Multiple_Loss( {"task_loss": task_loss_fn})
-
-        logger.info("Evaluating quantized model after GPTQ (before scale transfer)...")
-        val_accuracy_gptq, val_top5_accuracy_gptq, val_loss_gptq, best_acc_gptq, val_loss_dict_gptq = run_one_epoch(gptq_model, dataloader, None, criterion_val, 0, "val", 0, args, ddp_initialized=False)
-        logger.info(f'[GPTQ] val_Loss: {val_loss_dict_gptq["task_loss"].item():.5f}, val_top1_Acc: {val_accuracy_gptq:.5f}, val_top5_Acc: {val_top5_accuracy_gptq:.5f}')
-
-    elif args.dataset_name == 'co3d':
-        logger.info("Evaluating GPTQ model using CO3D evaluation script...")
-        run_evaluation_vggt(gptq_model_path)
+    # if args.dataset_name in ['imagenet', 'imagenet-mini']:
+    #     task_loss_fn = nn.CrossEntropyLoss()
+    #     criterion_val = Multiple_Loss( {"task_loss": task_loss_fn})
+    # 
+    #     logger.info("Evaluating quantized model after GPTQ (before scale transfer)...")
+    #     val_accuracy_gptq, val_top5_accuracy_gptq, val_loss_gptq, best_acc_gptq, val_loss_dict_gptq = run_one_epoch(gptq_model, dataloader, None, criterion_val, 0, "val", 0, args, ddp_initialized=False)
+    #     logger.info(f'[GPTQ] val_Loss: {val_loss_dict_gptq["task_loss"].item():.5f}, val_top1_Acc: {val_accuracy_gptq:.5f}, val_top5_Acc: {val_top5_accuracy_gptq:.5f}')
+    # 
+    # elif args.dataset_name == 'co3d':
+    #     logger.info("Evaluating GPTQ model using CO3D evaluation script...")
+    #     run_evaluation_vggt(gptq_model_path)
     
-    del gptq_model
     gc.collect()
     if args.device == 'cuda':
         torch.cuda.empty_cache()
 
     logger.info("Transferring GPTQ scales to LSQ quantizers...")
-    quantized_net = run_load_model(args)
+    quantized_net = create_model(args)
+    quantized_net = replace(args, quantized_net)
+    quantized_net = quantized_net.to(args.device)
     quantized_net.eval()
-    quantized_net = transfer_gptq_scales_to_lsq(quantized_net, scale_dict, args)
+    stepsize_init(quantized_net, calibration_loader, args.device, num_batches=1, dataset_name=args.dataset_name)
+    quantized_net = transfer_gptq_scales_to_lsq(quantized_net, gptq_model, scale_dict, args)
 
     lsq_model_path = os.path.join(args.output_path, "lsq_gptq_model.pt")
     torch.save(quantized_net.state_dict(), lsq_model_path)
     logger.info(f"Saved LSQ quantized model to {lsq_model_path}")
 
     if args.dataset_name in ['imagenet', 'imagenet-mini']:
+        task_loss_fn = nn.CrossEntropyLoss()
+        criterion_val = Multiple_Loss( {"task_loss": task_loss_fn})
+        
         logger.info("Evaluating final LSQ quantized model...")
         val_accuracy_lsq, val_top5_accuracy_lsq, val_loss_lsq, best_acc_lsq, val_loss_dict_lsq = run_one_epoch(quantized_net, dataloader, None, criterion_val, 0, "val", 0, args, ddp_initialized=False)
         logger.info(f'[LSQ] val_Loss: {val_loss_dict_lsq["task_loss"].item():.5f}, val_top1_Acc: {val_accuracy_lsq:.5f}, val_top5_Acc: {val_top5_accuracy_lsq:.5f}')
@@ -395,16 +426,17 @@ def run_gptq_quantization(args):
         logger.info("QUANTIZATION RESULTS SUMMARY:")
         logger.info("="*60)
         logger.info(f"Original FP32:  Loss: {val_loss_dict['task_loss'].item():.5f}, Top1: {val_accuracy:.5f}, Top5: {val_top5_accuracy:.5f}")
-        logger.info(f"GPTQ:           Loss: {val_loss_dict_gptq['task_loss'].item():.5f}, Top1: {val_accuracy_gptq:.5f}, Top5: {val_top5_accuracy_gptq:.5f}")
+        # logger.info(f"GPTQ:           Loss: {val_loss_dict_gptq['task_loss'].item():.5f}, Top1: {val_accuracy_gptq:.5f}, Top5: {val_top5_accuracy_gptq:.5f}")
         logger.info(f"LSQ (final):    Loss: {val_loss_dict_lsq['task_loss'].item():.5f}, Top1: {val_accuracy_lsq:.5f}, Top5: {val_top5_accuracy_lsq:.5f}")
         logger.info("="*60)
         
-        gptq_drop = val_accuracy - val_accuracy_gptq
+        # gptq_drop = val_accuracy - val_accuracy_gptq
         lsq_drop = val_accuracy - val_accuracy_lsq
-        logger.info(f"Accuracy drops: GPTQ: {gptq_drop:.5f}, LSQ: {lsq_drop:.5f}")
+        # logger.info(f"Accuracy drops: GPTQ: {gptq_drop:.5f}, LSQ: {lsq_drop:.5f}")
+        logger.info(f"Accuracy drop: LSQ: {lsq_drop:.5f}")
 
     elif args.dataset_name == 'co3d':
         logger.info("Evaluating final LSQ quantized model...")
-        run_evaluation_vggt(lsq_model_path)
+        run_evaluation_vggt(quantized_net)
     
     return quantized_net

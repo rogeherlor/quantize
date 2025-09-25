@@ -286,8 +286,8 @@ def replace_module(model, replacement_dict={}, exception_dict={}, arch="pytorchc
         print("fin init")
         model.output = replace_single_module(new_cls=exception_dict['__last_for_mobilenet__'], current_module=model.output)
     elif arch == "pytorchcv_vitb16":
-        model.conv_proj = replace_single_module(new_cls=exception_dict['__first__'], current_module=model.conv_proj)
-        model.heads.head = replace_single_module(new_cls=exception_dict['__last__'], current_module=model.heads.head)
+        model.patch_embed.proj = replace_single_module(new_cls=exception_dict['__first__'], current_module=model.patch_embed.proj)
+        model.head = replace_single_module(new_cls=exception_dict['__last__'], current_module=model.head)
     elif arch == "vggt":
         model.aggregator.patch_embed.patch_embed.proj = replace_single_module(new_cls=exception_dict['__first__'], current_module=model.aggregator.patch_embed.patch_embed.proj)
         model.camera_head.pose_branch.fc2 = replace_single_module(new_cls=exception_dict['__last__'], current_module=model.camera_head.pose_branch.fc2)

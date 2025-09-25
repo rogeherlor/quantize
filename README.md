@@ -3,13 +3,13 @@ Batchnorm2d? Se integra con la capa quantizada (folded) durante la inferencia? H
 
 Pasos:
 
+Fix resume training and implement for VGGT
 
 Entrenar:
-    Pasar GPTQ a LSQ
     Entrenar
+    Fix resume training
 
 PTQ:
-    Comprobar GPTQ y ver que funciona igual la transferencia a nuestra clasee LSQ_Quantize
     Mirar Outlier Suppression / Outlier Suppression+ (Park et al., 2023)
     GPTQ + SmoothQuant is the state of the art?
 
