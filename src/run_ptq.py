@@ -12,6 +12,7 @@ from src.ptq.rtn.rtn import run_rtn_quantization
 
 PTQ_CONFIG = {
     'gptq': dotdict({
+        'output_path': './data3/rogelio/model_zoo/vggt/',
         **(
             {'quant_blocks': [
                 'aggregator.patch_embed',
@@ -32,8 +33,7 @@ PTQ_CONFIG = {
         'gptq_actorder': False,
         'gptq_static_groups': False,
         'calibration_samples': 2048, #4096,  # 10000,
-        'replace_with_qmodules': True,
-        'output_path': './data3/rogelio/model_zoo/vggt/'
+        'replace_with_qmodules': True
     }),
     'rtn': dotdict({
         'calibration_samples': 1000,

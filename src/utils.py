@@ -290,7 +290,8 @@ def replace_module(model, replacement_dict={}, exception_dict={}, arch="pytorchc
         model.head = replace_single_module(new_cls=exception_dict['__last__'], current_module=model.head)
     elif arch == "vggt":
         model.aggregator.patch_embed.patch_embed.proj = replace_single_module(new_cls=exception_dict['__first__'], current_module=model.aggregator.patch_embed.patch_embed.proj)
-        model.camera_head.pose_branch.fc2 = replace_single_module(new_cls=exception_dict['__last__'], current_module=model.camera_head.pose_branch.fc2)
+        model.camera_head.pose_branch.fc2 = replace_single_module(new_cls=exception_dict['__camera_last__'], current_module=model.camera_head.pose_branch.fc2)
+        model.depth_head.scratch.output_conv2[2] = replace_single_module(new_cls=exception_dict['__depth_last__'], current_module=model.depth_head.scratch.output_conv2[2])
 
     return model
 

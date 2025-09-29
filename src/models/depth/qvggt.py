@@ -184,7 +184,12 @@ def replace(args, net):
                                 w_grad_scale_mode = args.w_first_last_grad_scale_mode, \
                                 x_grad_scale_mode = args.x_first_last_grad_scale_mode, \
                                 first_layer = True),
-        '__last__': partial(Q.QLinear,  num_bits=args.last_bits, w_quantizer =args.w_first_last_quantizer,x_quantizer = args.x_first_last_quantizer, \
+        '__camera_last__': partial(Q.QLinear,  num_bits=args.last_bits, w_quantizer =args.w_first_last_quantizer,x_quantizer = args.x_first_last_quantizer, \
+                                w_initializer = args.w_first_last_initializer, x_initializer = args.x_first_last_initializer, \
+                                w_grad_scale_mode = args.w_first_last_grad_scale_mode, \
+                                x_grad_scale_mode = args.x_first_last_grad_scale_mode, \
+                                first_layer = False),
+        '__depth_last__': partial(Q.QConv2d, num_bits=args.last_bits, w_quantizer =args.w_first_last_quantizer,x_quantizer = args.x_first_last_quantizer, \
                                 w_initializer = args.w_first_last_initializer, x_initializer = args.x_first_last_initializer, \
                                 w_grad_scale_mode = args.w_first_last_grad_scale_mode, \
                                 x_grad_scale_mode = args.x_first_last_grad_scale_mode, \
@@ -215,10 +220,44 @@ def run_train_vggt(rank, args):
     
     trainer = Trainer(**cfg)
     trainer.model.module = replace(args, trainer.model.module)
-
+    
     # run_load_model equivalent
     if args.action == 'load':
         stepsize_init(trainer.model.module, trainer.train_dataset.get_loader(0), args.device, num_batches=args.init_num, dataset_name=args.dataset_name)
+
+    if args.init_from and args.action == 'resume':
+        logger.info(f"Loading checkpoint from {args.init_from}")
+        checkpoint = torch.load(args.init_from, map_location="cpu")
+        
+        if "model" in checkpoint:
+            model_state_dict = checkpoint["model"]
+        else:
+            model_state_dict = checkpoint
+            
+        missing, unexpected = trainer.model.module.load_state_dict(
+            model_state_dict, strict=False
+        )
+        logger.info(f"Model loaded. Missing keys: {len(missing) if missing else 0}, Unexpected keys: {len(unexpected) if unexpected else 0}")
+        
+        if "optimizer" in checkpoint and hasattr(trainer, 'optims'):
+            logger.info("Loading optimizer state")
+            trainer.optims.optimizer.load_state_dict(checkpoint["optimizer"])
+        
+        # Load scale optimizer if it exists
+        if "s_optimizer" in checkpoint and hasattr(trainer, 's_optimizer') and trainer.s_optimizer is not None:
+            logger.info("Loading scale optimizer state")
+            trainer.s_optimizer.load_state_dict(checkpoint["s_optimizer"])
+        
+        if "s_scheduler" in checkpoint and hasattr(trainer, 's_scheduler') and trainer.s_scheduler is not None:
+            logger.info("Loading scale scheduler state")
+            trainer.s_scheduler.load_state_dict(checkpoint["s_scheduler"])
+        
+        if "epoch" in checkpoint:
+            trainer.epoch = checkpoint["epoch"]
+        if "steps" in checkpoint:
+            trainer.steps = checkpoint["steps"]
+        if "time_elapsed" in checkpoint:
+            trainer.ckpt_time_elapsed = checkpoint["time_elapsed"]
 
     if args.different_optimizer_mode:
         sparams, params = split_params(\
@@ -228,9 +267,11 @@ def run_train_vggt(rank, args):
     # setup optimizer & scheduler for scale
     if args.different_optimizer_mode:
         soptimizer, sscheduler = scheduler_optimizer_class(args, sparams, args.step_size_optimizer)
+        trainer.s_optimizer = soptimizer
+        trainer.s_scheduler = sscheduler
 
     # Train mode
     trainer.model.module.train()
     torch.set_grad_enabled(True)
 
-    trainer.run_train(s_optimizer=soptimizer, s_scheduler=sscheduler)
+    trainer.run_train()

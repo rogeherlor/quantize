@@ -9,13 +9,15 @@
             "type": "debugpy",
             "request": "launch",
             "program": "main.py",
-            "args": ["--mode", "PTQ", // "QAT" "STATS"
+            "args": ["--mode", "QAT", // "QAT" "STATS"
                     "--num_bits", "8",
-                    "--lr", "0.0002",
+                    "--lr", "0.04",
                     "--weight_decay", "1e-4",
                     "--x_quantizer", "LSQ_quantizer", 
                     "--w_quantizer", "LSQ_quantizer", 
                     "--initializer", "LSQ_initializer",
+                    "--w_first_last_quantizer", "FP",
+                    "--x_first_last_quantizer", "FP",
                     "--ptq_algorithm", "gptq",
                     "--init_from", "xxoutput/train/imagenet/pytorchcv_vitb16/w_LSQ_initializer__x_LSQ_initializer/w_LSQ_quantizer__x_LSQ_quantizer/4bit/AdamW_for_s_AdamW_for_others_LinearWarmupCosineAnnealing_lr0.0002_wd0.0001_xslr2e-05_wslr2e-05_xswd0.1_wswd0.1_w_wo_gs_x_wo_gs_wo_shift_init_num100_from_fp_model_wo_l1_reg_for_s_wo_od_wo_wn_wo_nv_300epochs-None/ckpt.pth",
                 ],
@@ -25,7 +27,7 @@
     ]
 }
 
-// python main.py --mode QAT --num_bits 16 --lr 0.1 --weight_decay 1e-4 --x_quantizer LSQ_quantizer --w_quantizer LSQ_quantizer --initializer LSQ_initializer
+// python main.py --mode QAT --num_bits 16 --lr 0.1 --weight_decay 1e-4 --x_quantizer LSQ_quantizer --w_quantizer LSQ_quantizer --initializer LSQ_initializer --w_first_last_quantizer MinMax_quantizer --x_first_last_quantizer MinMax_quantizer
 
 // EVALUATION CO3D
 // python src/models/depth/vggt/evaluation/test_co3d.py --model_path /home/rogelio/quantize/model_zoo/vggt/vggt_1B_commercial.pt --co3d_dir data3/rogelio/co3d/dataset/ --co3d_anno_dir data3/rogelio/co3d/preprocessed_dataset/ --seed 0

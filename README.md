@@ -4,6 +4,8 @@ Batchnorm2d? Se integra con la capa quantizada (folded) durante la inferencia? H
 Pasos:
 
 Fix resume training and implement for VGGT
+Cambiar parametros para poder lanzarlo facil en tsubame
+Test ddp para tsubame
 
 Entrenar:
     Entrenar
@@ -16,9 +18,10 @@ PTQ:
 Distill:
     ZeroQuant-V2 y original
 
-Comprobar pasar a nuestro LSQ_quantizer formato funciona bien. Estudiar si penaliza mucho que siempre sea symmetric
+
 Intentar fine-tuning
 Ver si fine tune a la vez o hacer lo de capa por capa viendo alguna metrica para saber cual hacer
+Estudiar si penaliza que siempre sea symmetric
 
 ToDo:
 Sustituir run_test de qat por STATS

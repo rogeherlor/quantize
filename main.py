@@ -47,6 +47,8 @@ if __name__ == '__main__':
     parser.add_argument('--x_quantizer', type=str, help='x quantizer')
     parser.add_argument('--w_quantizer', type=str, help='w quantizer')
     parser.add_argument('--initializer', type=str, help='initializer')
+    parser.add_argument('--w_first_last_quantizer', type=str, help='w first last quantizer')
+    parser.add_argument('--x_first_last_quantizer', type=str, help='x first last quantizer')
     parser.add_argument('--first_run', action= 'store_true', help='control logs to reduce the redundancy')
     parser.add_argument('--init_from', type=str, help='init_from')
 
@@ -74,8 +76,8 @@ if __name__ == '__main__':
     config.weight_decay = args.weight_decay
     config.x_step_size_wd = args.qparm_wd
     config.w_step_size_wd = args.qparm_wd
-    config.w_first_last_quantizer = MinMax_quantizer
-    config.x_first_last_quantizer = MinMax_quantizer
+    config.w_first_last_quantizer = QuantizerDict[args.w_first_last_quantizer]
+    config.x_first_last_quantizer = QuantizerDict[args.x_first_last_quantizer]
     config.x_quantizer = QuantizerDict[args.x_quantizer]
     config.w_quantizer = QuantizerDict[args.w_quantizer]
     config.x_initializer = InitializerDict[args.initializer]
