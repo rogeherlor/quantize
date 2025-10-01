@@ -4,7 +4,6 @@ Batchnorm2d? Se integra con la capa quantizada (folded) durante la inferencia? H
 Pasos:
 
 Fix resume training and implement for VGGT
-Cambiar parametros para poder lanzarlo facil en tsubame
 Test ddp para tsubame
 
 Entrenar:
@@ -12,8 +11,10 @@ Entrenar:
     Fix resume training
 
 PTQ:
+    Intentar mejorar GPTQ sequential inference
+    SmoothQuant
+    GPTQ + SmoothQuant
     Mirar Outlier Suppression / Outlier Suppression+ (Park et al., 2023)
-    GPTQ + SmoothQuant is the state of the art?
 
 Distill:
     ZeroQuant-V2 y original

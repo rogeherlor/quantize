@@ -1,8 +1,7 @@
-# python main.py --mode QAT --num_bits 2 --lr 0.1 --weight_decay 1e-4 --x_quantizer LSQ_quantizer --w_quantizer LSQ_quantizer --initializer LSQ_initializer
 action: load # resume
 train_id: null
-dataset_name: co3d # co3d
-model: vggt # pytorchcv_preresnet18 # vggt # pytorchcv_vitb16
+dataset_name: imagenet # co3d
+model: pytorchcv_vitb16 # pytorchcv_preresnet18 # vggt # pytorchcv_vitb16
 nepochs: 89
 batch_size: 256
 optimizer: SGD
@@ -11,7 +10,7 @@ nesterov: False
 weight_norm: null
 lr_scheduler: LinearWarmupCosineAnnealing
 warmup_epochs: 10
-warmup_lr: 0.00001
+warmup_lr: 1.0e-5
 
 nworkers: 10
 # Quantizer Settings

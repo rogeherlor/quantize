@@ -81,12 +81,24 @@ def make_ex_name(args):
     else:
         name_w_grad_scale = "wo_gs"
 
-    ex_name = '{0}/{1}/{2}/{3}bit/{4}_{5}_lr{6}_wd{7}_xslr{8}_wslr{9}_xswd{10}_wswd{11}_w_{12}_x_{13}_{14}_init_num{15}_{16}_{17}_{18}_{19}_{20}_{21}epochs-{22}' \
+    if args.w_first_last_quantizer == None:
+        name_w_first_last_quantizer = "FP"
+    else:  
+        name_w_first_last_quantizer = args.w_first_last_quantizer.__name__
+    
+    if args.x_first_last_quantizer == None:
+        name_x_first_last_quantizer = "FP"
+    else:
+        name_x_first_last_quantizer = args.x_first_last_quantizer.__name__
+
+    name_first_last_quantizer = "flwq_" + name_w_first_last_quantizer + "_flxq_" + name_x_first_last_quantizer
+
+    ex_name = '{0}/{1}/{2}/{3}bit/{4}_{5}/lr{6}_wd{7}_xslr{8}_wslr{9}_xswd{10}_wswd{11}_w_{12}_x_{13}_{14}_init_num{15}_{16}_{17}_{18}_{19}_{20}_{21}_{22}epochs-{23}' \
     .format(args.model, name_initializer, name_quant_mode, str(args.num_bits), name_optimizer, name_lr_sch, \
-    str(args.lr), str(args.weight_decay), str(args.x_step_size_lr ), str(args.w_step_size_lr ),
-    str(args.x_step_size_wd),str(args.w_step_size_wd), \
+    f"{args.lr:.2e}", f"{args.weight_decay:.2e}", f"{args.x_step_size_lr:.2e}", f"{args.w_step_size_lr:.2e}",
+    f"{args.x_step_size_wd:.2e}", f"{args.w_step_size_wd:.2e}", \
             name_w_grad_scale,  name_x_grad_scale, name_wd_for_shift,  args.init_num, \
-            name_action, name_l1_reg, name_osc_damp, name_wn, name_nesterov, args.nepochs, str(args.train_id))
+            name_action, name_l1_reg, name_osc_damp, name_wn, name_nesterov, name_first_last_quantizer, args.nepochs, str(args.train_id))
     
  
     return ex_name

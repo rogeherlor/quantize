@@ -263,9 +263,6 @@ def run_train_vggt(rank, args):
         sparams, params = split_params(\
             trainer.model.module, weight_decay=args.weight_decay, lr = args.lr, x_lr= args.x_step_size_lr, \
                 w_lr= args.w_step_size_lr, x_wd = args.x_step_size_wd, w_wd = args.w_step_size_wd)
-    
-    # setup optimizer & scheduler for scale
-    if args.different_optimizer_mode:
         soptimizer, sscheduler = scheduler_optimizer_class(args, sparams, args.step_size_optimizer)
         trainer.s_optimizer = soptimizer
         trainer.s_scheduler = sscheduler

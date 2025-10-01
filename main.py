@@ -71,8 +71,8 @@ if __name__ == '__main__':
         "Const_initializer": Const_initializer,
     }
     config.lr = args.lr
-    config.x_step_size_lr = round(args.coeff_qparm_lr*config.lr, ndigits=5)
-    config.w_step_size_lr = round(args.coeff_qparm_lr*config.lr, ndigits=5)
+    config.x_step_size_lr = args.coeff_qparm_lr*config.lr # round(args.coeff_qparm_lr*config.lr, ndigits=5)
+    config.w_step_size_lr = args.coeff_qparm_lr*config.lr # round(args.coeff_qparm_lr*config.lr, ndigits=5)
     config.weight_decay = args.weight_decay
     config.x_step_size_wd = args.qparm_wd
     config.w_step_size_wd = args.qparm_wd
