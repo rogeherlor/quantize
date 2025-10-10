@@ -9,6 +9,7 @@ from src.make_ex_name import make_ex_name
 from src.models.model import create_model
 from src.ptq.gptq.run_gptq import run_gptq_quantization
 from src.ptq.rtn.rtn import run_rtn_quantization
+from src.ptq.smoothquant.run_smoothquant import run_smoothquant_quantization
 
 PTQ_CONFIG = {
     'gptq': dotdict({
@@ -34,6 +35,24 @@ PTQ_CONFIG = {
         'gptq_static_groups': False,
         'calibration_samples': 2048, #4096,  # 10000,
         'replace_with_qmodules': True
+    }),
+    'smoothquant': dotdict({
+        'output_path': './data3/rogelio/model_zoo/vggt/',
+        'calibration_samples': 10000,
+        'replace_with_qmodules': True,
+        'smoothquant_alpha': 0.2,  # SmoothQuant alpha parameter. Lower alpha (0.5-0.65) puts less difficulty into weights, which is better for ViT
+        **(
+            {'quant_blocks': [
+                'aggregator.patch_embed',
+                *[f'aggregator.frame_blocks.{i}.attn' for i in range(24)],
+                *[f'aggregator.frame_blocks.{i}.mlp' for i in range(24)],
+                *[f'aggregator.global_blocks.{i}.attn' for i in range(24)],
+                *[f'aggregator.global_blocks.{i}.mlp' for i in range(24)],
+                'camera_head.trunk.0', 'camera_head.trunk.1', 'camera_head.trunk.2', 'camera_head.trunk.3',
+                'camera_head.embed_pose', 'camera_head.poseLN_modulation', 'camera_head.pose_branch'
+            ]} if False else
+            {'quant_blocks': ['blocks']}  # Set this to True for ViTB16
+        ),
     }),
     'rtn': dotdict({
         'calibration_samples': 1000,
@@ -77,6 +96,11 @@ def run_ptq(args):
         logger.info(f"  - GPTQ activation order: {args.gptq_actorder}")
         logger.info(f"  - Replace with Q-modules: {args.replace_with_qmodules}")
         qmodel = run_gptq_quantization(args)
+    elif ptq_algorithm == 'smoothquant':
+        logger.info(f"  - Calibration samples: {args.calibration_samples}")
+        logger.info(f"  - SmoothQuant alpha: {args.smoothquant_alpha}")
+        logger.info(f"  - Replace with Q-modules: {args.replace_with_qmodules}")
+        qmodel = run_smoothquant_quantization(args)
     elif ptq_algorithm == 'rtn':
         qmodel = run_rtn_quantization(args)
 

@@ -29,7 +29,6 @@ def run_evaluation_vggt(model, model_path=None):
     args.co3d_dir = "data3/rogelio/co3d/dataset/"
     args.co3d_anno_dir = "data3/rogelio/co3d/preprocessed_dataset/"
     args.seed = 0
-    args.model_path = model_path
     
     device = "cuda" if torch.cuda.is_available() else "cpu"
     dtype = torch.bfloat16 if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8 else torch.float16
@@ -146,7 +145,13 @@ def run_evaluation_vggt(model, model_path=None):
         mean_AUC_3 = np.mean([per_category_results[category]["Auc_3"] for category in per_category_results])
         print("-"*50)
         print(f"Mean AUC: {mean_AUC_30:.4f} (AUC@30), {mean_AUC_15:.4f} (AUC@15), {mean_AUC_5:.4f} (AUC@5), {mean_AUC_3:.4f} (AUC@3)")
-    print(args.model_path)
+    
+    if args.model_path:
+        print(f"Model path: {args.model_path}")
+    elif args.init_from:
+        print(f"Model path: {args.init_from}")
+    else:
+        print("Model path: None")
 
 def run_test_vggt(args):
     logger.info(f"==> Preparing testing for {args.dataset_name}..")
@@ -162,7 +167,9 @@ def run_test_vggt(args):
         cfg = compose(config_name="default")
 
     trainer = Trainer(**cfg)
-    trainer.run_val()
+    trainer.model.module = replace(args, trainer.model.module)
+    trainer._load_resuming_checkpoint(args.init_from)
+    run_evaluation_vggt(trainer.model.module)
 
 def replace(args, net):
     logger.info("==> Replacing model parameters..")
@@ -190,6 +197,11 @@ def replace(args, net):
                                 x_grad_scale_mode = args.x_first_last_grad_scale_mode, \
                                 first_layer = False),
         '__depth_last__': partial(Q.QConv2d, num_bits=args.last_bits, w_quantizer =args.w_first_last_quantizer,x_quantizer = args.x_first_last_quantizer, \
+                                w_initializer = args.w_first_last_initializer, x_initializer = args.x_first_last_initializer, \
+                                w_grad_scale_mode = args.w_first_last_grad_scale_mode, \
+                                x_grad_scale_mode = args.x_first_last_grad_scale_mode, \
+                                first_layer = False),
+        '__last__': partial(Q.QLinear,  num_bits=args.last_bits, w_quantizer =args.w_first_last_quantizer,x_quantizer = args.x_first_last_quantizer, \
                                 w_initializer = args.w_first_last_initializer, x_initializer = args.x_first_last_initializer, \
                                 w_grad_scale_mode = args.w_first_last_grad_scale_mode, \
                                 x_grad_scale_mode = args.x_first_last_grad_scale_mode, \

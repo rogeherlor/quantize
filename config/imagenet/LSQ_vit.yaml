@@ -4,7 +4,7 @@ dataset_name: imagenet # co3d
 model: pytorchcv_vitb16 # pytorchcv_preresnet18 # vggt
 nepochs: 600
 batch_size: 256
-optimizer: Adam
+optimizer: SGD
 momentum: 0.9
 nesterov: False
 weight_norm: null

@@ -57,7 +57,7 @@ if __name__ == '__main__':
     config.num_bits = args.num_bits
     
     QuantizerDict ={
-        "MinMax_quantizer": MinMax_quantizer,
+        "MinMax_quantizer": MinMax_quantizer, # Careful it is dynamic
         "LSQ_quantizer": LSQ_quantizer,
         "LCQ_quantizer": LCQ_quantizer,
         "APoT_quantizer": APoT_quantizer,
@@ -69,6 +69,7 @@ if __name__ == '__main__':
         "NMSE_initializer": NMSE_initializer,
         "LSQ_initializer": LSQ_initializer,
         "Const_initializer": Const_initializer,
+        "None": None
     }
     config.lr = args.lr
     config.x_step_size_lr = args.coeff_qparm_lr*config.lr # round(args.coeff_qparm_lr*config.lr, ndigits=5)

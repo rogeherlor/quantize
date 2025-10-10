@@ -6,6 +6,7 @@ import math
 #----------------------------------------------------------
 # LSQ
 #----------------------------------------------------------
+# This minmax is dynamic
 class MinMax_quantizer(nn.Module):
     def __init__(self, module, num_bits, mode, **kwargs):
         super(MinMax_quantizer, self).__init__()

@@ -4,7 +4,7 @@ Batchnorm2d? Se integra con la capa quantizada (folded) durante la inferencia? H
 Pasos:
 
 Fix resume training and implement for VGGT
-Test ddp para tsubame
+Smoothquant rapido y ponerse con vggt
 
 Entrenar:
     Entrenar

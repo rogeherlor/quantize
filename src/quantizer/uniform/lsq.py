@@ -17,8 +17,10 @@ class LSQ_quantizer(nn.Module):
                 module.x_Qn = 2 ** (num_bits-1)
                 module.x_Qp = 2 ** (num_bits-1) - 1
             else:
-                module.x_Qn = 0
-                module.x_Qp = 2 ** (num_bits  ) - 1
+                #module.x_Qn = 0
+                #module.x_Qp = 2 ** (num_bits  ) - 1
+                module.x_Qn = 2 ** (num_bits-1)
+                module.x_Qp = 2 ** (num_bits-1) - 1
             module.x_scale = nn.Parameter(torch.tensor([0.0], dtype=torch.float32)) # Cast at use
             module.x_Qparms['scale'] = module.x_scale
         elif mode == "weight":

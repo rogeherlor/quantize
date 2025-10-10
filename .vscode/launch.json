@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "main.py",
             "args": [ "--train_id", "test",
-                    "--mode", "STATS", // "QAT" "STATS"
+                    "--mode", "PTQ", // "QAT" "STATS"
                     "--num_bits", "8",
                     "--lr", "0.004",
                     "--coeff_qparm_lr", "0.1",
@@ -21,7 +21,7 @@
                     "--initializer", "NMSE_initializer",
                     "--w_first_last_quantizer", "FP",
                     "--x_first_last_quantizer", "FP",
-                    "--ptq_algorithm", "gptq",
+                    "--ptq_algorithm", "smoothquant",
                     "--init_from", "xxoutput/train/imagenet/pytorchcv_vitb16/w_LSQ_initializer__x_LSQ_initializer/w_LSQ_quantizer__x_LSQ_quantizer/4bit/AdamW_for_s_AdamW_for_others_LinearWarmupCosineAnnealing_lr0.0002_wd0.0001_xslr2e-05_wslr2e-05_xswd0.1_wswd0.1_w_wo_gs_x_wo_gs_wo_shift_init_num100_from_fp_model_wo_l1_reg_for_s_wo_od_wo_wn_wo_nv_300epochs-None/ckpt.pth",
                 ],
             "console": "integratedTerminal",
