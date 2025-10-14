@@ -10,7 +10,7 @@ nesterov: False
 weight_norm: null
 lr_scheduler: LinearWarmupCosineAnnealing
 warmup_epochs: 10
-warmup_lr: 5.0e-8
+warmup_lr: 5.0e-6
 
 nworkers: 10
 # Quantizer Settings
@@ -33,7 +33,7 @@ x_grad_scale_mode: null
 different_optimizer_mode: True
 step_size_optimizer: AdamW
 pre_trained: True
-evaluation_mode: True
+evaluation_mode: False
 write_log: True
 ddp: False
 gpu_rank: 0 # Can be multiple ranks: 0,1

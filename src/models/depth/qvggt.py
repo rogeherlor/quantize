@@ -146,12 +146,6 @@ def run_evaluation_vggt(model, model_path=None):
         print("-"*50)
         print(f"Mean AUC: {mean_AUC_30:.4f} (AUC@30), {mean_AUC_15:.4f} (AUC@15), {mean_AUC_5:.4f} (AUC@5), {mean_AUC_3:.4f} (AUC@3)")
     
-    if args.model_path:
-        print(f"Model path: {args.model_path}")
-    elif args.init_from:
-        print(f"Model path: {args.init_from}")
-    else:
-        print("Model path: None")
 
 def run_test_vggt(args):
     logger.info(f"==> Preparing testing for {args.dataset_name}..")
@@ -218,7 +212,7 @@ def run_train_vggt(rank, args):
     os.environ["RANK"] = str(rank)
     os.environ["WORLD_SIZE"] = str(args.world_size)
     os.environ["MASTER_ADDR"] = "localhost"
-    os.environ["MASTER_PORT"] = "12395"
+    os.environ["MASTER_PORT"] = "12397"
     os.environ["NCCL_P2P_DISABLE"] = "1"
 
     os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
@@ -232,6 +226,7 @@ def run_train_vggt(rank, args):
     
     trainer = Trainer(**cfg)
     trainer.model.module = replace(args, trainer.model.module)
+    trainer.gradient_clipper.setup_clipping(trainer.model)
     
     # run_load_model equivalent
     if args.action == 'load':

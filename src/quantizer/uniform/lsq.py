@@ -46,6 +46,12 @@ def _LSQ_quantizer(x, scale, Qn, Qp, num_elements, grad_scale_mode):
     qp_t = float(Qp)
 
     # print(scale)
+    if scale <= 0:
+        scale_grad = scale.grad if scale.grad is not None else "No gradient"
+        print(f"Scale assertion failed!")
+        print(f"  Scale value: {scale.item() if scale.numel() == 1 else scale}")
+        print(f"  Scale gradient: {scale_grad}")
+        print(f"  Qn: {qn_t}, Qp: {qp_t}")
     assert scale > 0, 'scale = {}, {}, {}'.format(scale, qn_t, qp_t)
 
     # gradient scaling
