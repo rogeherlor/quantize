@@ -160,7 +160,7 @@ def run_test_vggt(args):
     os.environ["RANK"] = "0"
     os.environ["WORLD_SIZE"] = str(args.world_size) if args.ddp else "1"
     os.environ["MASTER_ADDR"] = "localhost"
-    os.environ["MASTER_PORT"] = "12395"
+    os.environ["MASTER_PORT"] = "12396"
     os.environ["NCCL_P2P_DISABLE"] = "1"
 
     with initialize(version_base=None, config_path="vggt/training/config"):
