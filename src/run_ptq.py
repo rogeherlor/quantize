@@ -40,8 +40,8 @@ PTQ_CONFIG = {
         'output_path': './data3/rogelio/model_zoo/vggt/',
         'calibration_samples': 10000,
         'replace_with_qmodules': True,
-        'smoothquant_alpha': [0.25, 0.5, 0.7],
-        'smoothquant_top_k': 1,  # Set to None to smooth all layers
+        'smoothquant_alpha': [0.25, 0.5, 0.75],
+        'smoothquant_top_k': None,  # Set to None to smooth all layers
         **(
             {'quant_blocks': [
                 'aggregator.patch_embed',

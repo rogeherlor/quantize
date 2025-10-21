@@ -3,11 +3,10 @@ Batchnorm2d? Se integra con la capa quantizada (folded) durante la inferencia? H
 
 Pasos:
 
-Fix resume training and implement for VGGT
-Smoothquant rapido y ponerse con vggt
+Smoothquant entero
+Distill
 
 Entrenar:
-    Entrenar
     Fix resume training
 
 PTQ:

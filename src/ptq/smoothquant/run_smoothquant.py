@@ -203,25 +203,194 @@ def smooth_vit_blocks(model, act_scales, alpha=0.5, top_k=5):
     
     logger.info(f"Smoothed {smoothed_count} ViT blocks")
 
+@torch.no_grad()
+def smooth_vggt_blocks(model, act_scales, alpha=0.5, quant_blocks=None):
+    """Apply SmoothQuant smoothing to VGGT blocks (memory-efficient block-by-block)
+    
+    Args:
+        model: Model to smooth
+        act_scales: Dict of activation scales per layer
+        alpha: Smoothing factor
+        quant_blocks: List of block names to quantize (from args.quant_blocks)
+    """
+    from src.models.depth.vggt.vggt.layers.block import Block
+    
+    if quant_blocks is None:
+        logger.warning("No quant_blocks specified for VGGT smoothing")
+        return
+    
+    smoothed_count = 0
+    
+    # Expand blocks if they are ModuleList/Sequential (reuse GPTQ's logic)
+    expanded_blocks = []
+    for block_name in quant_blocks:
+        try:
+            parent, leaf = _resolve_parent_and_leaf(model, block_name)
+            block_module = getattr(parent, leaf) if hasattr(parent, leaf) else parent[int(leaf)]
+            
+            if isinstance(block_module, (nn.ModuleList, nn.Sequential)):
+                # Process each submodule in the list
+                for i in range(len(block_module)):
+                    expanded_blocks.append(f"{block_name}.{i}")
+            else:
+                expanded_blocks.append(block_name)
+        except Exception as e:
+            logger.warning(f"Could not resolve block {block_name}: {e}")
+            continue
+    
+    logger.info(f"Processing {len(expanded_blocks)} VGGT blocks for smoothing")
+    
+    # Process each block
+    for block_name in expanded_blocks:
+        try:
+            parent, leaf = _resolve_parent_and_leaf(model, block_name)
+            block_module = getattr(parent, leaf) if hasattr(parent, leaf) else parent[int(leaf)]
+            
+            if isinstance(block_module, Block):
+                # Smooth attention: norm1 -> attn.qkv
+                qkv_name = f"{block_name}.attn.qkv"
+                if qkv_name in act_scales and hasattr(block_module, 'norm1') and hasattr(block_module.attn, 'qkv'):
+                    logger.debug(f"Smoothing {block_name}.norm1 -> {block_name}.attn.qkv")
+                    smooth_ln_fcs(block_module.norm1, [block_module.attn.qkv], act_scales[qkv_name], alpha)
+                    smoothed_count += 1
+                
+                # Smooth MLP: norm2 -> mlp.fc1
+                fc1_name = f"{block_name}.mlp.fc1"
+                if fc1_name in act_scales and hasattr(block_module, 'norm2') and hasattr(block_module.mlp, 'fc1'):
+                    logger.debug(f"Smoothing {block_name}.norm2 -> {block_name}.mlp.fc1")
+                    smooth_ln_fcs(block_module.norm2, [block_module.mlp.fc1], act_scales[fc1_name], alpha)
+                    smoothed_count += 1
+            else:
+                # Not a Block, skip
+                logger.debug(f"Skipping {block_name} - not a Block instance")
+                
+        except Exception as e:
+            logger.warning(f"Error processing block {block_name}: {e}")
+            continue
+    
+    logger.info(f"Smoothed {smoothed_count} layer pairs in VGGT blocks")
+
+def _resolve_parent_and_leaf(model, dotted_path):
+    """
+    Given "foo.bar.3.baz", return (parent_module, leaf_name_or_index).
+    Handles ModuleList / Sequential indices.
+    (Borrowed from GPTQ implementation)
+    """
+    obj = model
+    parts = dotted_path.split(".")
+    for p in parts[:-1]:
+        if hasattr(obj, p):
+            obj = getattr(obj, p)
+        elif p.isdigit() and isinstance(obj, (nn.ModuleList, nn.Sequential)):
+            obj = obj[int(p)]
+        else:
+            raise AttributeError(f"Cannot resolve '{p}' in '{dotted_path}'")
+    return obj, parts[-1]
+
 def apply_smoothquant(model, dataloader, args):
     """Apply SmoothQuant smoothing to model"""
     model.eval()
 
     logger.info("Collecting activation scales for smoothing with {} samples...".format(args.calibration_samples))
     act_scales = collect_activation_scales_smoothquant(model, dataloader, args)
+
     
     # Get top_k parameter (default to None for smoothing all layers)
     top_k = getattr(args, 'smoothquant_top_k', None)
     alpha = getattr(args, 'smoothquant_alpha', 0.5)
     
-    if top_k is not None:
-        logger.info(f"Applying SmoothQuant smoothing to top {top_k} layers with alpha={alpha}...")
+    if args.dataset_name == 'co3d':
+        # VGGT smoothing
+        quant_blocks = getattr(args, 'quant_blocks', None)
+        logger.info(f"Applying SmoothQuant smoothing to VGGT with alpha={alpha}...")
+        smooth_vggt_blocks(model, act_scales, alpha=alpha, quant_blocks=quant_blocks)
     else:
-        logger.info(f"Applying SmoothQuant smoothing to all layers with alpha={alpha}...")
-    
-    smooth_vit_blocks(model, act_scales, alpha=alpha, top_k=top_k)
+        # ViT smoothing (ImageNet)
+        if top_k is not None:
+            logger.info(f"Applying SmoothQuant smoothing to top {top_k} layers with alpha={alpha}...")
+        else:
+            logger.info(f"Applying SmoothQuant smoothing to all layers with alpha={alpha}...")
+        
+        smooth_vit_blocks(model, act_scales, alpha=alpha, top_k=top_k)
     
     return model
+
+def disable_quantizers_for_layers(net, layer_patterns):
+    """
+    Disable w_quantizer and x_quantizer for layers matching specific patterns.
+    
+    Args:
+        net: The neural network model
+        layer_patterns: List of string patterns to match in layer names (e.g., ['.attn.proj', '.mlp.fc2'])
+    """
+    disabled_layers = []
+    disabled_count = 0
+    
+    for name, module in net.named_modules():
+        # Check if this layer name matches any of the patterns
+        if any(pattern in name for pattern in layer_patterns):
+            disabled_this_layer = False
+            if hasattr(module, 'w_quantizer') and module.w_quantizer is not None:
+                module.w_quantizer = None
+                disabled_count += 1
+                disabled_this_layer = True
+                logger.info(f"  ✓ Disabled w_quantizer for: {name}")
+            if hasattr(module, 'x_quantizer') and module.x_quantizer is not None:
+                module.x_quantizer = None
+                disabled_count += 1
+                disabled_this_layer = True
+                logger.info(f"  ✓ Disabled x_quantizer for: {name}")
+            
+            if disabled_this_layer:
+                disabled_layers.append(name)
+    
+    logger.info(f"\n{'='*60}")
+    logger.info(f"QUANTIZER DISABLING SUMMARY:")
+    logger.info(f"  Total layers affected: {len(disabled_layers)}")
+    logger.info(f"  Total quantizers disabled: {disabled_count}")
+    logger.info(f"  Patterns used: {layer_patterns}")
+    logger.info(f"{'='*60}\n")
+    
+    return net
+
+def verify_quantizer_status(net, layer_patterns=None):
+    """
+    Verify and print the quantizer status for all layers or specific patterns.
+    
+    Args:
+        net: The neural network model
+        layer_patterns: Optional list of patterns to filter layers
+    """
+    logger.info("\n" + "="*60)
+    logger.info("QUANTIZER STATUS VERIFICATION:")
+    logger.info("="*60)
+    
+    quantized_count = 0
+    fp_count = 0
+    
+    for name, module in net.named_modules():
+        if hasattr(module, 'w_quantizer') or hasattr(module, 'x_quantizer'):
+            # If patterns specified, only show matching layers
+            if layer_patterns and not any(pattern in name for pattern in layer_patterns):
+                continue
+            
+            w_status = "✓ Quantized" if (hasattr(module, 'w_quantizer') and module.w_quantizer is not None) else "✗ FP32"
+            x_status = "✓ Quantized" if (hasattr(module, 'x_quantizer') and module.x_quantizer is not None) else "✗ FP32"
+            
+            if w_status == "✗ FP32" or x_status == "✗ FP32":
+                fp_count += 1
+                logger.info(f"  {name}:")
+                logger.info(f"    w_quantizer: {w_status}")
+                logger.info(f"    x_quantizer: {x_status}")
+            else:
+                quantized_count += 1
+    
+    logger.info(f"\nSummary:")
+    logger.info(f"  Layers with FP32 (no quantization): {fp_count}")
+    logger.info(f"  Layers fully quantized: {quantized_count}")
+    logger.info("="*60 + "\n")
+    
+    return fp_count, quantized_count
 
 def initialize_lsq_scales(model, dataloader, args):
     """Initialize LSQ scales from calibration data"""
@@ -387,99 +556,219 @@ def _run_smoothquant_single_alpha(args, alpha_value, dataloader, original_fp_mod
     logger.info(f"Saved smoothed FP32 model to {smoothquant_model_path}")
 
     # Step 3: Apply LSQ replacement to original model (only if not already done)
+    # This creates FIVE naive variants for ablation study:
+    # 3a. Naive quantization (all layers)
+    # 3b. Naive quantization with proj/fc2 disabled
+    # 3c. Naive quantization with ONLY proj/fc2 quantized (qkv/fc1 disabled)
+    # 3d. Naive quantization with ONLY attention layers (proj disabled)
+    # 3e. Naive quantization with ONLY MLP layers (fc2 disabled)
+    naive_lsq_all = None
+    naive_lsq_no_proj_fc2 = None
+    naive_lsq_only_proj_fc2 = None
+    
     if original_results is None:
-        logger.info("\nStep 3: Applying LSQ replacement to original model...")
-        original_lsq_model = replace(args, original_fp_model)
-        original_lsq_model = original_lsq_model.to(args.device)
-        initialize_lsq_scales(original_lsq_model, calibration_loader, args)
+        # 3a. Naive quantization - ALL layers quantized
+        logger.info("\nStep 3a: Creating NAIVE quantization model (all layers quantized)...")
+        naive_lsq_all = replace(args, create_model(args).to(args.device))
+        initialize_lsq_scales(naive_lsq_all, calibration_loader, args)
+        
+        # 3b. Naive quantization - with proj/fc2 DISABLED
+        logger.info("\nStep 3b: Creating NAIVE quantization model (NO proj/fc2)...")
+        naive_lsq_no_proj_fc2 = replace(args, create_model(args).to(args.device))
+        logger.info("\n==> Disabling quantizers for .attn.proj and .mlp.fc2 layers")
+        naive_lsq_no_proj_fc2 = disable_quantizers_for_layers(naive_lsq_no_proj_fc2, ['.attn.proj', '.mlp.fc2'])
+        verify_quantizer_status(naive_lsq_no_proj_fc2, layer_patterns=['.attn.proj', '.mlp.fc2'])
+        initialize_lsq_scales(naive_lsq_no_proj_fc2, calibration_loader, args)
+        
+        # 3c. Naive quantization - ONLY proj/fc2 quantized (qkv/fc1 disabled)
+        logger.info("\nStep 3c: Creating NAIVE quantization model (ONLY proj/fc2)...")
+        naive_lsq_only_proj_fc2 = replace(args, create_model(args).to(args.device))
+        logger.info("\n==> Disabling quantizers for .attn.qkv and .mlp.fc1 layers")
+        naive_lsq_only_proj_fc2 = disable_quantizers_for_layers(naive_lsq_only_proj_fc2, ['.attn.qkv', '.mlp.fc1'])
+        verify_quantizer_status(naive_lsq_only_proj_fc2, layer_patterns=['.attn.qkv', '.mlp.fc1'])
+        initialize_lsq_scales(naive_lsq_only_proj_fc2, calibration_loader, args)
     else:
-        logger.info("\nStep 3: Skipping original model quantization (already done)...")
-        original_lsq_model = None
+        logger.info("\nStep 3: Skipping naive quantization models (already done)...")
 
-    # Step 4: Apply LSQ replacement to smoothed model
-    logger.info("\nStep 4: Applying LSQ replacement to smoothed model...")
-    smoothed_lsq_model = replace(args, smoothed_fp_model)
-    smoothed_lsq_model = smoothed_lsq_model.to(args.device)
-    initialize_lsq_scales(smoothed_lsq_model, calibration_loader, args)
+    # Step 4: Apply LSQ replacement to smoothed models
+    # IMPORTANT: We need to save the FP32 smoothed weights before any LSQ replacement,
+    # since replace() modifies the model in-place
+    logger.info("\nStep 4: Saving smoothed FP32 weights for reuse...")
+    smoothed_fp_weights = smoothed_fp_model.state_dict()
+    
+    # Step 4a: SmoothQuant with ALL layers quantized
+    logger.info("\nStep 4a: Creating SMOOTHQUANT model (all layers quantized)...")
+    smoothed_lsq_all = replace(args, smoothed_fp_model)
+    smoothed_lsq_all = smoothed_lsq_all.to(args.device)
+    initialize_lsq_scales(smoothed_lsq_all, calibration_loader, args)
+
+    # Step 4b: SmoothQuant with proj/fc2 DISABLED
+    logger.info("\nStep 4b: Creating SMOOTHQUANT model (proj/fc2 disabled)...")
+    # Create a fresh FP32 model and load the smoothed weights
+    smoothed_fp_model_copy = create_model(args).to(args.device)
+    smoothed_fp_model_copy.load_state_dict(smoothed_fp_weights)
+    
+    # Now apply LSQ replacement
+    smoothed_lsq_selective = replace(args, smoothed_fp_model_copy)
+    smoothed_lsq_selective = smoothed_lsq_selective.to(args.device)
+    logger.info("\n==> Disabling quantizers for .attn.proj and .mlp.fc2 layers (smoothquant selective)")
+    smoothed_lsq_selective = disable_quantizers_for_layers(smoothed_lsq_selective, ['.attn.proj', '.mlp.fc2'])
+    verify_quantizer_status(smoothed_lsq_selective, layer_patterns=['.attn.proj', '.mlp.fc2'])
+    initialize_lsq_scales(smoothed_lsq_selective, calibration_loader, args)
 
     # Save LSQ models
-    if original_lsq_model is not None:
-        original_lsq_path = os.path.join(args.output_path, "lsq_original_model.pt")
-        torch.save(original_lsq_model.state_dict(), original_lsq_path)
-        logger.info(f"Saved original LSQ model to {original_lsq_path}")
+    if naive_lsq_all is not None:
+        naive_all_path = os.path.join(args.output_path, "lsq_naive_all_layers.pt")
+        torch.save(naive_lsq_all.state_dict(), naive_all_path)
+        logger.info(f"Saved naive LSQ model (all layers) to {naive_all_path}")
     
-    smoothed_lsq_path = os.path.join(args.output_path, f"lsq_smoothquant_model_alpha_{alpha_value}.pt")
-    torch.save(smoothed_lsq_model.state_dict(), smoothed_lsq_path)
-    logger.info(f"Saved smoothed LSQ model to {smoothed_lsq_path}")
+    if naive_lsq_no_proj_fc2 is not None:
+        naive_no_proj_fc2_path = os.path.join(args.output_path, "lsq_naive_no_proj_fc2.pt")
+        torch.save(naive_lsq_no_proj_fc2.state_dict(), naive_no_proj_fc2_path)
+        logger.info(f"Saved naive LSQ model (no proj/fc2) to {naive_no_proj_fc2_path}")
+    
+    if naive_lsq_only_proj_fc2 is not None:
+        naive_only_proj_fc2_path = os.path.join(args.output_path, "lsq_naive_only_proj_fc2.pt")
+        torch.save(naive_lsq_only_proj_fc2.state_dict(), naive_only_proj_fc2_path)
+        logger.info(f"Saved naive LSQ model (only proj/fc2) to {naive_only_proj_fc2_path}")
+    
+    smoothed_all_path = os.path.join(args.output_path, f"lsq_smoothquant_all_layers_alpha_{alpha_value}.pt")
+    torch.save(smoothed_lsq_all.state_dict(), smoothed_all_path)
+    logger.info(f"Saved smoothed LSQ model (all layers) to {smoothed_all_path}")
+    
+    smoothed_selective_path = os.path.join(args.output_path, f"lsq_smoothquant_selective_alpha_{alpha_value}.pt")
+    torch.save(smoothed_lsq_selective.state_dict(), smoothed_selective_path)
+    logger.info(f"Saved smoothed LSQ model (selective) to {smoothed_selective_path}")
 
-    # Evaluation
+    # Evaluation - ABLATION STUDY
     result_dict = {'alpha': alpha_value}
     if args.dataset_name in ['imagenet', 'imagenet-mini']:
         task_loss_fn = nn.CrossEntropyLoss()
         criterion_val = Multiple_Loss({"task_loss": task_loss_fn})
         
-        # Evaluate original model only if not already done
+        # Evaluate all models only if not already done
         if original_results is None:
-            logger.info("\n1. Evaluating original LSQ model...")
-            val_accuracy_original, val_top5_accuracy_original, val_loss_original, _, val_loss_dict_original = run_one_epoch(
-                original_lsq_model, dataloader, None, criterion_val, 0, "val", 0, args, ddp_initialized=False
+            logger.info("\n" + "="*70)
+            logger.info("ABLATION STUDY: Evaluating all quantization variants")
+            logger.info("="*70)
+            
+            # 1. Naive quantization - ALL layers
+            logger.info("\n1. Evaluating NAIVE quantization (all layers)...")
+            val_acc_naive_all, val_top5_naive_all, _, _, val_loss_naive_all = run_one_epoch(
+                naive_lsq_all, dataloader, None, criterion_val, 0, "val", 0, args, ddp_initialized=False
             )
-            logger.info(f'[Original LSQ] val_Loss: {val_loss_dict_original["task_loss"].item():.5f}, val_top1_Acc: {val_accuracy_original:.5f}, val_top5_Acc: {val_top5_accuracy_original:.5f}')
+            logger.info(f'[Naive All] val_Loss: {val_loss_naive_all["task_loss"].item():.5f}, val_top1_Acc: {val_acc_naive_all:.5f}, val_top5_Acc: {val_top5_naive_all:.5f}')
+            
+            # 2. Naive quantization - NO proj/fc2
+            logger.info("\n2. Evaluating NAIVE quantization (NO proj/fc2)...")
+            val_acc_naive_no_proj_fc2, val_top5_naive_no_proj_fc2, _, _, val_loss_naive_no_proj_fc2 = run_one_epoch(
+                naive_lsq_no_proj_fc2, dataloader, None, criterion_val, 0, "val", 0, args, ddp_initialized=False
+            )
+            logger.info(f'[Naive No Proj/FC2] val_Loss: {val_loss_naive_no_proj_fc2["task_loss"].item():.5f}, val_top1_Acc: {val_acc_naive_no_proj_fc2:.5f}, val_top5_Acc: {val_top5_naive_no_proj_fc2:.5f}')
+            
+            # 3. Naive quantization - ONLY proj/fc2
+            logger.info("\n3. Evaluating NAIVE quantization (ONLY proj/fc2)...")
+            val_acc_naive_only_proj_fc2, val_top5_naive_only_proj_fc2, _, _, val_loss_naive_only_proj_fc2 = run_one_epoch(
+                naive_lsq_only_proj_fc2, dataloader, None, criterion_val, 0, "val", 0, args, ddp_initialized=False
+            )
+            logger.info(f'[Naive Only Proj/FC2] val_Loss: {val_loss_naive_only_proj_fc2["task_loss"].item():.5f}, val_top1_Acc: {val_acc_naive_only_proj_fc2:.5f}, val_top5_Acc: {val_top5_naive_only_proj_fc2:.5f}')
         else:
-            logger.info("\n1. Using cached original LSQ model results...")
-            val_accuracy_original = original_results['val_accuracy_original']
-            val_top5_accuracy_original = original_results['val_top5_accuracy_original']
-            val_loss_dict_original = original_results['val_loss_dict_original']
-            logger.info(f'[Original LSQ] val_Loss: {val_loss_dict_original["task_loss"].item():.5f}, val_top1_Acc: {val_accuracy_original:.5f}, val_top5_Acc: {val_top5_accuracy_original:.5f}')
+            logger.info("\n" + "="*70)
+            logger.info("ABLATION STUDY: Using cached naive quantization results")
+            logger.info("="*70)
+            val_acc_naive_all = original_results['val_acc_naive_all']
+            val_top5_naive_all = original_results['val_top5_naive_all']
+            val_loss_naive_all = original_results['val_loss_naive_all']
+            val_acc_naive_no_proj_fc2 = original_results['val_acc_naive_no_proj_fc2']
+            val_top5_naive_no_proj_fc2 = original_results['val_top5_naive_no_proj_fc2']
+            val_loss_naive_no_proj_fc2 = original_results['val_loss_naive_no_proj_fc2']
+            val_acc_naive_only_proj_fc2 = original_results['val_acc_naive_only_proj_fc2']
+            val_top5_naive_only_proj_fc2 = original_results['val_top5_naive_only_proj_fc2']
+            val_loss_naive_only_proj_fc2 = original_results['val_loss_naive_only_proj_fc2']
+            logger.info(f'[Naive All] val_Loss: {val_loss_naive_all["task_loss"].item():.5f}, val_top1_Acc: {val_acc_naive_all:.5f}, val_top5_Acc: {val_top5_naive_all:.5f}')
+            logger.info(f'[Naive No Proj/FC2] val_Loss: {val_loss_naive_no_proj_fc2["task_loss"].item():.5f}, val_top1_Acc: {val_acc_naive_no_proj_fc2:.5f}, val_top5_Acc: {val_top5_naive_no_proj_fc2:.5f}')
+            logger.info(f'[Naive Only Proj/FC2] val_Loss: {val_loss_naive_only_proj_fc2["task_loss"].item():.5f}, val_top1_Acc: {val_acc_naive_only_proj_fc2:.5f}, val_top5_Acc: {val_top5_naive_only_proj_fc2:.5f}')
         
-        logger.info(f"\n2. Evaluating smoothed LSQ model (alpha={alpha_value})...")
-        val_accuracy_smoothed, val_top5_accuracy_smoothed, val_loss_smoothed, _, val_loss_dict_smoothed = run_one_epoch(
-            smoothed_lsq_model, dataloader, None, criterion_val, 0, "val", 0, args, ddp_initialized=False
+        # 3. SmoothQuant - ALL layers
+        logger.info(f"\n3. Evaluating SMOOTHQUANT (all layers, alpha={alpha_value})...")
+        val_acc_smooth_all, val_top5_smooth_all, _, _, val_loss_smooth_all = run_one_epoch(
+            smoothed_lsq_all, dataloader, None, criterion_val, 0, "val", 0, args, ddp_initialized=False
         )
-        logger.info(f'[Smoothed LSQ] val_Loss: {val_loss_dict_smoothed["task_loss"].item():.5f}, val_top1_Acc: {val_accuracy_smoothed:.5f}, val_top5_Acc: {val_top5_accuracy_smoothed:.5f}')
+        logger.info(f'[SmoothQuant All] val_Loss: {val_loss_smooth_all["task_loss"].item():.5f}, val_top1_Acc: {val_acc_smooth_all:.5f}, val_top5_Acc: {val_top5_smooth_all:.5f}')
+        
+        # 4. SmoothQuant - proj/fc2 DISABLED
+        logger.info(f"\n4. Evaluating SMOOTHQUANT (proj/fc2 disabled, alpha={alpha_value})...")
+        val_acc_smooth_sel, val_top5_smooth_sel, _, _, val_loss_smooth_sel = run_one_epoch(
+            smoothed_lsq_selective, dataloader, None, criterion_val, 0, "val", 0, args, ddp_initialized=False
+        )
+        logger.info(f'[SmoothQuant Selective] val_Loss: {val_loss_smooth_sel["task_loss"].item():.5f}, val_top1_Acc: {val_acc_smooth_sel:.5f}, val_top5_Acc: {val_top5_smooth_sel:.5f}')
 
-        logger.info("\n" + "="*70)
-        logger.info(f"SMOOTHQUANT QUANTIZATION RESULTS (alpha={alpha_value})")
-        logger.info("="*70)
-        logger.info(f"{'Model':<25} {'Loss':>10} {'Top-1 Acc':>12} {'Top-5 Acc':>12} {'Acc Diff':>10}")
-        logger.info("-"*70)
-        logger.info(f"{'Original LSQ':<25} {val_loss_dict_original['task_loss'].item():>10.5f} {val_accuracy_original:>12.5f} {val_top5_accuracy_original:>12.5f} {'-':>10}")
-        acc_diff = val_accuracy_smoothed - val_accuracy_original
-        logger.info(f"{'Smoothed LSQ':<25} {val_loss_dict_smoothed['task_loss'].item():>10.5f} {val_accuracy_smoothed:>12.5f} {val_top5_accuracy_smoothed:>12.5f} {acc_diff:>+10.5f}")
-        logger.info("="*70)
-        logger.info(f"\nAccuracy difference (Smoothed - Original): {acc_diff:+.5f} ({acc_diff*100:+.2f}%)")
-        logger.info("="*70 + "\n")
+        # Calculate diffs for storage
+        diff_naive_no_proj_fc2 = val_acc_naive_no_proj_fc2 - val_acc_naive_all
+        diff_naive_only_proj_fc2 = val_acc_naive_only_proj_fc2 - val_acc_naive_all
+        diff_smooth_all = val_acc_smooth_all - val_acc_naive_all
+        diff_smooth_sel = val_acc_smooth_sel - val_acc_naive_all
         
         # Store results for sweep comparison
         result_dict.update({
-            'original_top1_acc': val_accuracy_original * 100,
-            'original_top5_acc': val_top5_accuracy_original * 100,
-            'smoothed_top1_acc': val_accuracy_smoothed * 100,
-            'smoothed_top5_acc': val_top5_accuracy_smoothed * 100,
-            'original_loss': val_loss_dict_original['task_loss'].item(),
-            'smoothed_loss': val_loss_dict_smoothed['task_loss'].item(),
-            'acc_diff': acc_diff * 100
+            'naive_all_top1': val_acc_naive_all * 100,
+            'naive_all_top5': val_top5_naive_all * 100,
+            'naive_all_loss': val_loss_naive_all['task_loss'].item(),
+            
+            'naive_no_proj_fc2_top1': val_acc_naive_no_proj_fc2 * 100,
+            'naive_no_proj_fc2_top5': val_top5_naive_no_proj_fc2 * 100,
+            'naive_no_proj_fc2_loss': val_loss_naive_no_proj_fc2['task_loss'].item(),
+            
+            'naive_only_proj_fc2_top1': val_acc_naive_only_proj_fc2 * 100,
+            'naive_only_proj_fc2_top5': val_top5_naive_only_proj_fc2 * 100,
+            'naive_only_proj_fc2_loss': val_loss_naive_only_proj_fc2['task_loss'].item(),
+            
+            'smooth_all_top1': val_acc_smooth_all * 100,
+            'smooth_all_top5': val_top5_smooth_all * 100,
+            'smooth_all_loss': val_loss_smooth_all['task_loss'].item(),
+            
+            'smooth_sel_top1': val_acc_smooth_sel * 100,
+            'smooth_sel_top5': val_top5_smooth_sel * 100,
+            'smooth_sel_loss': val_loss_smooth_sel['task_loss'].item(),
+            
+            'diff_naive_no_proj_fc2': diff_naive_no_proj_fc2 * 100,
+            'diff_naive_only_proj_fc2': diff_naive_only_proj_fc2 * 100,
+            'diff_smooth_all': diff_smooth_all * 100,
+            'diff_smooth_sel': diff_smooth_sel * 100,
         })
 
     elif args.dataset_name == 'co3d':
-        logger.info("\nEvaluating original LSQ model...")
-        run_evaluation_vggt(original_lsq_model)
-        logger.info("\nEvaluating smoothed LSQ model...")
-        run_evaluation_vggt(smoothed_lsq_model)
+        if naive_lsq_all is not None:
+            logger.info("\n1. Evaluating naive LSQ model (all layers)...")
+            run_evaluation_vggt(naive_lsq_all)
+            logger.info("\n2. Evaluating naive LSQ model (NO proj/fc2)...")
+            run_evaluation_vggt(naive_lsq_no_proj_fc2)
+            logger.info("\n3. Evaluating naive LSQ model (ONLY proj/fc2)...")
+            run_evaluation_vggt(naive_lsq_only_proj_fc2)
+        logger.info("\n4. Evaluating smoothed LSQ model (all layers)...")
+        run_evaluation_vggt(smoothed_lsq_all)
+        logger.info("\n5. Evaluating smoothed LSQ model (NO proj/fc2)...")
+        run_evaluation_vggt(smoothed_lsq_selective)
     
     gc.collect()
     if args.device == 'cuda':
         torch.cuda.empty_cache()
     
-    # Prepare original results for reuse
+    # Prepare original results for reuse (cache naive quantization results)
     if original_results is None:
         original_results = {
-            'val_accuracy_original': val_accuracy_original,
-            'val_top5_accuracy_original': val_top5_accuracy_original,
-            'val_loss_dict_original': val_loss_dict_original
+            'val_acc_naive_all': val_acc_naive_all,
+            'val_top5_naive_all': val_top5_naive_all,
+            'val_loss_naive_all': val_loss_naive_all,
+            'val_acc_naive_no_proj_fc2': val_acc_naive_no_proj_fc2,
+            'val_top5_naive_no_proj_fc2': val_top5_naive_no_proj_fc2,
+            'val_loss_naive_no_proj_fc2': val_loss_naive_no_proj_fc2,
+            'val_acc_naive_only_proj_fc2': val_acc_naive_only_proj_fc2,
+            'val_top5_naive_only_proj_fc2': val_top5_naive_only_proj_fc2,
+            'val_loss_naive_only_proj_fc2': val_loss_naive_only_proj_fc2,
         }
     
-    return smoothed_lsq_model, original_fp_model, original_results, result_dict
+    return smoothed_lsq_selective, original_fp_model, original_results, result_dict
 
 
 def run_smoothquant_quantization(args):
@@ -521,33 +810,86 @@ def run_smoothquant_quantization(args):
         if is_sweep:
             logger.info(f"\n✓ Completed alpha = {alpha_value}\n")
     
-    # Print final summary if sweep
-    if is_sweep and len(results_summary) > 0 and 'smoothed_top1_acc' in results_summary[0]:
-        logger.info(f"\n{'='*90}")
-        logger.info(f"ALPHA SWEEP SUMMARY - {len(results_summary)} experiments")
-        logger.info(f"{'='*90}")
-        logger.info(f"{'Alpha':<10} {'Original Top-1':>15} {'Smoothed Top-1':>15} {'Difference':>12} {'Status':>12}")
-        logger.info(f"{'-'*90}")
+    # Print all results at the end
+    if len(results_summary) > 0 and 'smooth_sel_top1' in results_summary[0]:
+        logger.info(f"\n{'='*140}")
+        logger.info(f"FINAL ABLATION STUDY RESULTS - ALL ALPHAS")
+        logger.info(f"{'='*140}\n")
         
-        best_alpha = None
-        best_smoothed_acc = -float('inf')
-        
+        # Print detailed results for each alpha
         for result in results_summary:
             alpha = result['alpha']
-            orig_acc = result.get('original_top1_acc', 0)
-            smooth_acc = result.get('smoothed_top1_acc', 0)
-            diff = smooth_acc - orig_acc
+            logger.info(f"{'='*100}")
+            logger.info(f"ALPHA = {alpha}")
+            logger.info(f"{'='*100}")
+            logger.info(f"{'Model':<45} {'Loss':>10} {'Top-1 Acc':>12} {'Top-5 Acc':>12} {'Acc Diff':>12}")
+            logger.info(f"{'-'*100}")
             
-            status = ""
-            if smooth_acc > best_smoothed_acc:
-                best_smoothed_acc = smooth_acc
-                best_alpha = alpha
-                status = "✓ Best"
+            logger.info(f"{'1. Naive (all layers)':<45} {result['naive_all_loss']:>10.5f} {result['naive_all_top1']:>11.4f}% {result['naive_all_top5']:>11.4f}% {'baseline':>12}")
+            logger.info(f"{'2. Naive (NO proj/fc2, keep qkv/fc1)':<45} {result['naive_no_proj_fc2_loss']:>10.5f} {result['naive_no_proj_fc2_top1']:>11.4f}% {result['naive_no_proj_fc2_top5']:>11.4f}% {result['diff_naive_no_proj_fc2']:>+11.4f}%")
+            logger.info(f"{'3. Naive (ONLY proj/fc2, NO qkv/fc1)':<45} {result['naive_only_proj_fc2_loss']:>10.5f} {result['naive_only_proj_fc2_top1']:>11.4f}% {result['naive_only_proj_fc2_top5']:>11.4f}% {result['diff_naive_only_proj_fc2']:>+11.4f}%")
+            logger.info(f"{'4. SmoothQuant (all layers)':<45} {result['smooth_all_loss']:>10.5f} {result['smooth_all_top1']:>11.4f}% {result['smooth_all_top5']:>11.4f}% {result['diff_smooth_all']:>+11.4f}%")
+            logger.info(f"{'5. SmoothQuant (NO proj/fc2)':<45} {result['smooth_sel_loss']:>10.5f} {result['smooth_sel_top1']:>11.4f}% {result['smooth_sel_top5']:>11.4f}% {result['diff_smooth_sel']:>+11.4f}%")
             
-            logger.info(f"{alpha:<10.2f} {orig_acc:>14.4f}% {smooth_acc:>14.4f}% {diff:>+11.4f}% {status:>12}")
+            logger.info(f"{'='*100}")
+            logger.info(f"Key Insights:")
+            logger.info(f"  • Removing proj/fc2 from naive: {result['diff_naive_no_proj_fc2']:+.4f}%")
+            logger.info(f"  • Quantizing ONLY proj/fc2: {result['diff_naive_only_proj_fc2']:+.4f}%")
+            logger.info(f"  • SmoothQuant all vs naive all: {result['diff_smooth_all']:+.4f}%")
+            logger.info(f"  • SmoothQuant selective vs naive all: {result['diff_smooth_sel']:+.4f}%")
+            
+            # Calculate layer sensitivity
+            qkv_fc1_impact = result['naive_no_proj_fc2_top1'] - result['naive_only_proj_fc2_top1']
+            proj_fc2_impact = result['diff_naive_only_proj_fc2']
+            smooth_sel_vs_naive_sel = result['smooth_sel_top1'] - result['naive_no_proj_fc2_top1']
+            
+            logger.info(f"\nLayer Sensitivity Analysis:")
+            logger.info(f"  • qkv/fc1 quantization impact: {qkv_fc1_impact:+.4f}%")
+            logger.info(f"  • proj/fc2 quantization impact: {proj_fc2_impact:+.4f}%")
+            logger.info(f"  • SmoothQuant selective vs naive selective: {smooth_sel_vs_naive_sel:+.4f}%")
+            logger.info(f"{'='*100}\n")
         
-        logger.info(f"{'-'*90}")
-        logger.info(f"Best alpha: {best_alpha} with {best_smoothed_acc:.4f}% top-1 accuracy")
-        logger.info(f"{'='*90}\n")
+        # Print compact comparison table
+        if is_sweep and len(results_summary) > 1:
+            logger.info(f"\n{'='*140}")
+            logger.info(f"ALPHA COMPARISON SUMMARY")
+            logger.info(f"{'='*140}")
+            logger.info(f"{'Alpha':<8} {'Naive All':>12} {'No Proj/FC2':>12} {'Only Proj/FC2':>13} {'Smooth All':>12} {'Smooth Sel':>12} {'Best':>18}")
+            logger.info(f"{'-'*140}")
+            
+            best_alpha = None
+            best_acc = -float('inf')
+            best_method = None
+            
+            for result in results_summary:
+                alpha = result['alpha']
+                naive_all = result.get('naive_all_top1', 0)
+                naive_no = result.get('naive_no_proj_fc2_top1', 0)
+                naive_only = result.get('naive_only_proj_fc2_top1', 0)
+                smooth_all = result.get('smooth_all_top1', 0)
+                smooth_sel = result.get('smooth_sel_top1', 0)
+                
+                # Find best for this alpha
+                methods = [
+                    ('Naive All', naive_all),
+                    ('No Proj/FC2', naive_no),
+                    ('Only Proj/FC2', naive_only),
+                    ('Smooth All', smooth_all),
+                    ('Smooth Sel', smooth_sel)
+                ]
+                local_best_method, local_best_acc = max(methods, key=lambda x: x[1])
+                
+                # Track global best
+                if local_best_acc > best_acc:
+                    best_acc = local_best_acc
+                    best_alpha = alpha
+                    best_method = local_best_method
+                
+                best_marker = f"✓ {local_best_method}"
+                logger.info(f"{alpha:<8.2f} {naive_all:>11.4f}% {naive_no:>11.4f}% {naive_only:>12.4f}% {smooth_all:>11.4f}% {smooth_sel:>11.4f}% {best_marker:>18}")
+            
+            logger.info(f"{'-'*140}")
+            logger.info(f"Global Best: {best_method} @ alpha={best_alpha} with {best_acc:.4f}% top-1 accuracy")
+            logger.info(f"{'='*140}\n")
     
     return smoothed_model

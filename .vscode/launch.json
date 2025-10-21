@@ -22,7 +22,7 @@
                     "--w_first_last_quantizer", "FP",
                     "--x_first_last_quantizer", "FP",
                     "--ptq_algorithm", "smoothquant",
-                    "--init_from", "xxxdata3/rogelio/logs/exp001/ckpts/checkpoint.pt",
+                    "--init_from", "data3/rogelio/logs_test/exp001/ckpts/checkpoint_20.pt",
                 ],
             "console": "integratedTerminal",
             "python": "/home/rogelio/miniconda3/envs/quantize/bin/python"

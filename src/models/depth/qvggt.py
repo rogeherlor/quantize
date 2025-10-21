@@ -248,7 +248,15 @@ def run_train_vggt(rank, args):
         
         if "optimizer" in checkpoint and hasattr(trainer, 'optims'):
             logger.info("Loading optimizer state")
-            trainer.optims.optimizer.load_state_dict(checkpoint["optimizer"])
+            if isinstance(trainer.optims, list):
+                if isinstance(checkpoint["optimizer"], list):
+                    for i, optim in enumerate(trainer.optims):
+                        optim.optimizer.load_state_dict(checkpoint["optimizer"][i])
+                else:
+                    # Single optimizer in checkpoint but list expected
+                    trainer.optims[0].optimizer.load_state_dict(checkpoint["optimizer"])
+            else:
+                trainer.optims.optimizer.load_state_dict(checkpoint["optimizer"])
         
         # Load scale optimizer if it exists
         if "s_optimizer" in checkpoint and hasattr(trainer, 's_optimizer') and trainer.s_optimizer is not None:
@@ -259,12 +267,21 @@ def run_train_vggt(rank, args):
             logger.info("Loading scale scheduler state")
             trainer.s_scheduler.load_state_dict(checkpoint["s_scheduler"])
         
-        if "epoch" in checkpoint:
+        if "prev_epoch" in checkpoint:
+            trainer.epoch = checkpoint["prev_epoch"] + 1  # Resume from next epoch
+            logger.info(f"Resuming from epoch {trainer.epoch}")
+        elif "epoch" in checkpoint:
+            # Fallback for older checkpoints
             trainer.epoch = checkpoint["epoch"]
+            logger.info(f"Resuming from epoch {trainer.epoch}")
+        
         if "steps" in checkpoint:
             trainer.steps = checkpoint["steps"]
+            logger.info(f"Loaded steps: {trainer.steps}")
+        
         if "time_elapsed" in checkpoint:
             trainer.ckpt_time_elapsed = checkpoint["time_elapsed"]
+            logger.info(f"Loaded time elapsed: {trainer.ckpt_time_elapsed:.2f}s")
 
     if args.different_optimizer_mode:
         sparams, params = split_params(\

@@ -137,9 +137,14 @@ class ModuleStatsHook:
         self.stats_collector = stats_collector
     
     def __call__(self, module, input, output):
-        if output is not None:
-            # Use streaming statistics instead of accumulating all data
-            self.stats_collector.update_streaming_stats(f"{self.name}.activation", output)
+        # input is a tuple of tensors in PyTorch hooks
+        if input is not None and len(input) > 0:
+            # Get the first input tensor (usually the main input)
+            input_tensor = input[0]
+            if isinstance(input_tensor, torch.Tensor):
+                self.stats_collector.update_streaming_stats(f"{self.name}.activation_in", input_tensor)
+        if output is not None and isinstance(output, torch.Tensor):
+            self.stats_collector.update_streaming_stats(f"{self.name}.activation_out", output)
 
 def attach_stats_hooks(model, stats_collector, module_types):
     hooks = []
@@ -372,10 +377,10 @@ def run_stats(args):
     """Main stats collection function"""
     MODULE_TYPES = ['Conv2d', 'Linear', 'QConv2d', 'QLinear', 'LSQ_quantizer', 'ReLU', 'MinMax_quantizer']
     # Suffixes from static parameters (weights, scale), or dynamic tensors (activation)
-    LOG_TENSOR_SUFFIXES = ['weight', 'bias', 'activation', 'scale', 'w_scale', 'x_scale']
-    IMAGE_SUFFIXES = ['weight', 'activation']
+    LOG_TENSOR_SUFFIXES = ['weight', 'bias', 'activation_in', 'activation_out', 'scale', 'w_scale', 'x_scale']
+    IMAGE_SUFFIXES = ['weight', 'activation_in', 'activation_out']
     SCALAR_SUFFIXES = ['scale', 'w_scale', 'x_scale']
-    COMPARISON_SUFFIXES = ['weight', 'activation']
+    COMPARISON_SUFFIXES = ['weight', 'activation_in', 'activation_out']
     
     num_inference_batches = max(1, int(1 / args.batch_size))
 
