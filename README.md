@@ -2,6 +2,11 @@ Dudas:
 Batchnorm2d? Se integra con la capa quantizada (folded) durante la inferencia? Hailo lo hace pero aqui que pasa?
 
 Pasos:
+4W 8A (QAT y GPTQ)
+Hardware real aceleracion
+Mejorar tiempo de entrenamiento
+(Bias-variance es regularizacion y no se suele aplicar en LLMs pero en quantizacion puede que aporte ¿?)
+Distill, check self-supervised y temperature
 
 Smoothquant entero
 Distill

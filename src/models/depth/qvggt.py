@@ -220,7 +220,6 @@ def run_train_vggt(rank, args):
     os.environ["HYDRA_FULL_ERROR"] = "1"
     os.environ["TORCH_NCCL_ASYNC_ERROR_HANDLING"] = "1"
 
-    
     with initialize(version_base=None, config_path="vggt/training/config"):
         cfg = compose(config_name="default")
     

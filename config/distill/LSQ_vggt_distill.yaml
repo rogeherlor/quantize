@@ -1,0 +1,35 @@
+
+
+# Distillation hyperparameters
+distill_alpha: 0.7  # Weight for feature matching loss
+distill_beta: 0.3   # Weight for task loss (from ground truth)
+
+
+# Stage-specific overrides (optional)
+stages:
+  patch_embed:
+    epochs: 10
+    lr: 1e-4
+  blocks_0_5:
+    epochs: 8
+    lr: 5e-5
+  blocks_6_11:
+    epochs: 8
+    lr: 5e-5
+  blocks_12_17:
+    epochs: 8
+    lr: 5e-5
+  blocks_18_23:
+    epochs: 8
+    lr: 5e-5
+  heads:
+    epochs: 10
+    lr: 1e-4
+
+# Final fine-tuning
+final_finetune_epochs: 20
+final_finetune_lr: 2e-5
+
+# Evaluation
+fast_eval: true  # Use fast evaluation during training
+eval_freq: 1  # Evaluate every N stages

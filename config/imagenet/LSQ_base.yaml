@@ -1,4 +1,4 @@
-action: load # resume
+action: resume # resume load
 train_id: null
 dataset_name: co3d # imagenet # co3d
 model: vggt # pytorchcv_preresnet18 # vggt # pytorchcv_vitb16
@@ -33,10 +33,10 @@ x_grad_scale_mode: null
 different_optimizer_mode: True
 step_size_optimizer: AdamW
 pre_trained: True
-evaluation_mode: True
+evaluation_mode: False
 write_log: True
 ddp: False
-gpu_rank: 0 # Can be multiple ranks: 0,1
+gpu_rank: 1 # Can be multiple ranks: 0,1
 invisible_pgb: False
 save_path: output
 save_mode: xxxall_checkpoints

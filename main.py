@@ -16,6 +16,7 @@ from src.initializer import *
 from src.run_qat import run_qat
 from src.run_stats import run_stats
 from src.run_ptq import run_ptq
+from src.run_distill import run_distill
 
 if __name__ == '__main__':
     with open('./config/imagenet/LSQ_base.yaml') as file:
@@ -125,6 +126,10 @@ if __name__ == '__main__':
         logger.info("Start STATS at the following setting")
         run_stats(config)
         logger.info("STATS finished")
+    elif args.mode == 'DISTILL':
+        logger.info("Start DISTILL at the following setting")
+        run_distill(config)
+        logger.info("DISTILL finished")
 
     torch.cuda.synchronize() if torch.cuda.is_available() else None
     end = time.time()

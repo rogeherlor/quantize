@@ -10,9 +10,9 @@
             "request": "launch",
             "program": "main.py",
             "args": [ "--train_id", "test",
-                    "--mode", "QAT", // "QAT" "STATS" "PTQ"
+                    "--mode", "QAT", // "QAT" "STATS" "PTQ" "DISTILL"
                     "--num_bits", "8",
-                    "--lr", "5.0e-5",
+                    "--lr", "1.0e-3",
                     "--coeff_qparm_lr", "0.1",
                     "--weight_decay", "0.05",
                     "--qparm_wd", "0.1",
@@ -22,7 +22,7 @@
                     "--w_first_last_quantizer", "FP",
                     "--x_first_last_quantizer", "FP",
                     "--ptq_algorithm", "smoothquant",
-                    "--init_from", "data3/rogelio/logs_test/exp001/ckpts/checkpoint_20.pt",
+                    "--init_from", "data3/rogelio/logs_clip_1_10_lr/exp001/ckpts/checkpoint.pt",
                 ],
             "console": "integratedTerminal",
             "python": "/home/rogelio/miniconda3/envs/quantize/bin/python"
