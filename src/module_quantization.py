@@ -30,8 +30,39 @@ class QLinear(nn.Linear):
         self.first_layer = first_layer
         self.x_Qparms={}
         self.w_Qparms={}
-        self.w_quantizer= w_quantizer(self, num_bits, "weight") if w_quantizer != None else None
-        self.x_quantizer= x_quantizer(self, num_bits, "activation") if x_quantizer != None else None
+
+        if w_quantizer is not None and w_quantizer.__name__ == "LSQC_quantizer":
+            self.w_scale_shape = (out_features, 1)
+            # Enable learnable clipping for weights (helps with outliers)
+            self.w_quantizer = w_quantizer(self, num_bits, "weight", 
+                                          scale_shape=self.w_scale_shape,
+                                          enable_learnable_clip=True)
+        elif w_quantizer is not None:
+            self.w_scale_shape = (1,)
+            self.w_quantizer = w_quantizer(self, num_bits, "weight")
+        else:
+            self.w_quantizer = None
+
+        if x_quantizer is not None and x_quantizer.__name__ == "LSQC_quantizer":
+            # Learned per-channel activation quantization for stable QAT training
+            self.x_scale_shape = (1, in_features)
+            self.x_quantizer = x_quantizer(self, num_bits, "activation",
+                                          scale_shape=self.x_scale_shape,
+                                          enable_smooth_quant=False,
+                                          enable_learnable_clip=True)
+            
+            # SmoothQuant-style channel balancing [1, d_in]
+            # Redistributes quantization difficulty between weights and activations
+            self.smooth_scale = nn.Parameter(torch.ones((1, in_features), dtype=torch.float32))
+            self.use_smooth_quant = True
+        elif x_quantizer is not None:
+            self.x_scale_shape = (1,)
+            self.x_quantizer = x_quantizer(self, num_bits, "activation")
+            self.use_smooth_quant = False
+        else:
+            self.x_quantizer = None
+            self.use_smooth_quant = False
+
         self.w_initializer= w_initializer
         self.x_initializer= x_initializer
         self.register_buffer('init_state', torch.tensor(False))
@@ -67,8 +98,39 @@ class QConv2d(nn.Conv2d):
         self.first_layer = first_layer
         self.x_Qparms={}
         self.w_Qparms={}
-        self.w_quantizer= w_quantizer(self, num_bits, "weight") if w_quantizer != None else None
-        self.x_quantizer= x_quantizer(self, num_bits, "activation") if x_quantizer != None else None
+
+        if w_quantizer is not None and w_quantizer.__name__ == "LSQC_quantizer":
+            self.w_scale_shape = (out_channels, 1, 1, 1)
+            # Enable learnable clipping for weights (helps with outliers)
+            self.w_quantizer = w_quantizer(self, num_bits, "weight", 
+                                          scale_shape=self.w_scale_shape,
+                                          enable_learnable_clip=True)
+        elif w_quantizer is not None:
+            self.w_scale_shape = (1,)
+            self.w_quantizer = w_quantizer(self, num_bits, "weight")
+        else:
+            self.w_quantizer = None
+
+        if x_quantizer is not None and x_quantizer.__name__ == "LSQC_quantizer":
+            # Learned per-channel activation quantization for stable QAT training
+            self.x_scale_shape = (1, in_channels, 1, 1)
+            self.x_quantizer = x_quantizer(self, num_bits, "activation",
+                                          scale_shape=self.x_scale_shape,
+                                          enable_smooth_quant=False,
+                                          enable_learnable_clip=True)
+            
+            # SmoothQuant-style channel balancing [1, channels, 1, 1]
+            # Redistributes quantization difficulty between weights and activations
+            self.smooth_scale = nn.Parameter(torch.ones((1, in_channels, 1, 1), dtype=torch.float32))
+            self.use_smooth_quant = True
+        elif x_quantizer is not None:
+            self.x_scale_shape = (1,)
+            self.x_quantizer = x_quantizer(self, num_bits, "activation")
+            self.use_smooth_quant = False
+        else:
+            self.x_quantizer = None
+            self.use_smooth_quant = False
+
         self.w_initializer= w_initializer
         self.x_initializer= x_initializer
         self.register_buffer('init_state', torch.tensor(False))
@@ -102,10 +164,24 @@ def _forward_common(module, input):
             module.w_initializer(weight, module.w_Qparms, module.w_Qn, module.w_Qp, module.w_quantizer, "symmetric")            
             module.w_quantizer.scale_to_Qparms(module.w_Qparms, module.w_Qn, module.w_Qp)
 
+    # SmoothQuant-style channel balancing (if enabled)
+    # Redistributes quantization difficulty between weights and activations
+    if hasattr(module, 'use_smooth_quant') and module.use_smooth_quant:
+        # Apply balancing: weight *= smooth_scale, activation /= smooth_scale
+        weight = weight * module.smooth_scale
+        input = input / module.smooth_scale
+
     if module.x_quantizer != None:
-        input  = module.x_quantizer(input, module.x_Qparms, module.x_Qn, module.x_Qp, input.shape[1], module.x_grad_scale_mode)
+        x_numel = input.numel()
+        # For LSQC activations with per-channel scales
+        if hasattr(module, 'x_scale_shape') and 'scale' in module.x_Qparms and module.x_Qparms['scale'].numel() > 1:
+             x_numel = x_numel // module.x_Qparms['scale'].numel()
+        input  = module.x_quantizer(input, module.x_Qparms, module.x_Qn, module.x_Qp, x_numel, module.x_grad_scale_mode)
     if module.w_quantizer != None:
-        weight = module.w_quantizer(weight, module.w_Qparms, module.w_Qn, module.w_Qp, weight.numel(), module.w_grad_scale_mode)
+        w_numel = weight.numel()
+        if hasattr(module, 'w_scale_shape') and module.w_Qparms['scale'].numel() > 1:
+             w_numel = w_numel // module.w_Qparms['scale'].numel()
+        weight = module.w_quantizer(weight, module.w_Qparms, module.w_Qn, module.w_Qp, w_numel, module.w_grad_scale_mode)
 
     if module.weight_norm in ["WN", "LWN"]:
         weight = weight.mul(std)

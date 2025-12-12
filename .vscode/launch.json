@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "main.py",
             "args": [ "--train_id", "test",
-                    "--mode", "QAT", // "QAT" "STATS" "PTQ" "DISTILL"
+                    "--mode", "DISTILL", // "QAT" "STATS" "PTQ" "DISTILL"
                     "--num_bits", "8",
                     "--lr", "1.0e-3",
                     "--coeff_qparm_lr", "0.1",

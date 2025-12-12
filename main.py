@@ -60,6 +60,7 @@ if __name__ == '__main__':
     QuantizerDict ={
         "MinMax_quantizer": MinMax_quantizer, # Careful it is dynamic
         "LSQ_quantizer": LSQ_quantizer,
+        "LSQC_quantizer": LSQC_quantizer,
         "LCQ_quantizer": LCQ_quantizer,
         "APoT_quantizer": APoT_quantizer,
         "Positive_nuLSQ_quantizer": Positive_nuLSQ_quantizer,
@@ -69,6 +70,7 @@ if __name__ == '__main__':
     InitializerDict ={
         "NMSE_initializer": NMSE_initializer,
         "LSQ_initializer": LSQ_initializer,
+        "LSQC_initializer": LSQC_initializer,
         "Const_initializer": Const_initializer,
         "None": None
     }

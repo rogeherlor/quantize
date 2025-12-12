@@ -1,4 +1,4 @@
-action: resume # resume load
+action: load # resume load
 train_id: null
 dataset_name: co3d # imagenet # co3d
 model: vggt # pytorchcv_preresnet18 # vggt # pytorchcv_vitb16
