@@ -9,7 +9,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 from functools import partial
-import copy
 
 from hydra import initialize, compose
 import src.models.depth.vggt.vggt
@@ -24,135 +23,73 @@ from src.make_ex_name import *
 from src.models.depth.vggt.evaluation.test_co3d import *
 
 
-class DistillationModelWrapper(nn.Module):
+class DistillationLossWrapper(nn.Module):
     """
-    Wraps the student model to compute distillation loss during forward pass.
-    This bypasses the Trainer's loss function entirely.
+    Simple distillation loss: original_loss + feature_matching_loss
+    Standard practice - teacher stays on GPU, uses @torch.no_grad()
     """
-    def __init__(self, student_model, teacher_model, original_loss, 
-                 teacher_extractor, student_extractor, alpha=0.7, beta=0.3):
+    def __init__(self, original_loss, teacher_model, teacher_extractor, student_extractor, alpha=0.7, beta=0.3):
         super().__init__()
-        self.student_model = student_model
-        self.teacher_model = teacher_model
         self.original_loss = original_loss
+        self.teacher_model = teacher_model
         self.teacher_extractor = teacher_extractor
         self.student_extractor = student_extractor
         self.alpha = alpha
         self.beta = beta
-        self.cached_batch = None
-        self.cached_distill_loss = None
         
-    def forward(self, images):
-        """Forward pass that stores intermediate features"""
-        # Just run student model normally
-        output = self.student_model(images=images)
-        return output
-    
-    def compute_distillation_loss(self, student_pred, batch):
-        """Called by our custom loss wrapper to add distillation"""
-        # Move teacher to GPU temporarily for forward pass (saves memory)
-        device = batch["images"].device
+    def forward(self, student_pred, batch):
+        """Compute combined distillation + original loss"""
         
-        # Check if teacher is on CPU by checking first parameter
-        teacher_on_cpu = next(self.teacher_model.parameters()).device.type == 'cpu'
+        # 1. Compute original loss from original loss function
+        original_loss_dict = self.original_loss(student_pred, batch)
+        original_loss_val = original_loss_dict["objective"]
         
-        if teacher_on_cpu:
-            self.teacher_model = self.teacher_model.to(device)
-        
-        # CRITICAL FIX: Do NOT use inference_mode() - it creates inference tensors that
-        # cannot be used in any gradient computation, even after detaching!
-        # Standard approach from HuggingFace/PyTorch: use torch.no_grad() and detach features
-        with torch.no_grad():
-            teacher_pred = self.teacher_model(images=batch["images"])
-        
-        # Move teacher back to CPU immediately to free GPU memory
-        if teacher_on_cpu:
-            self.teacher_model = self.teacher_model.cpu()
-            torch.cuda.empty_cache()
-        
-        # Get teacher features and DETACH + CLONE to convert from no_grad tensors
-        # This is the standard distillation approach - teacher features are frozen
-        # but can be used in loss computation
-        teacher_feats_raw = self.teacher_extractor.get_features()
-        teacher_feats = {k: v.detach().clone() for k, v in teacher_feats_raw.items()}
-        
+        # 2. Get student features (already captured during forward)
         student_feats = self.student_extractor.get_features()
         
-        if not student_feats or not teacher_feats:
-            return torch.tensor(0.0, device=device, requires_grad=True)
+        # 3. Run teacher and get features (no gradients needed)
+        with torch.no_grad():
+            teacher_pred = self.teacher_model(images=batch["images"])
+            
+            # Compute teacher loss for monitoring
+            teacher_loss_dict = self.original_loss(teacher_pred, batch)
+            teacher_loss_val = teacher_loss_dict["objective"]
         
-        feat_loss = compute_feature_matching_loss(teacher_feats, student_feats)
+        teacher_feats = self.teacher_extractor.get_features()
         
-        # Clear features immediately
+        # 4. Compute feature matching loss (per-layer for better monitoring)
+        if student_feats and teacher_feats:
+            feat_losses = compute_feature_matching_loss_per_layer(teacher_feats, student_feats)
+            # Average per-layer losses or fallback to zero connected to graph
+            feat_loss = sum(feat_losses.values()) / len(feat_losses) if feat_losses else original_loss_val * 0.0
+        else:
+            feat_losses = {}
+            # CRITICAL: Use original_loss_val * 0.0 instead of torch.tensor() to maintain computation graph
+            feat_loss = original_loss_val * 0.0
+        
+        # 5. Combine losses
+        total_loss = self.alpha * feat_loss + self.beta * original_loss_val
+        
+        # 6. Clear features for next iteration
         self.teacher_extractor.features = {}
         self.student_extractor.features = {}
         
-        return feat_loss
-
-
-class DistillationLossWrapper(nn.Module):
-    """
-    Wrapper that adds distillation loss to task loss.
-    Now properly handles gradient computation.
-    """
-    def __init__(self, original_loss, model_wrapper, alpha=0.7, beta=0.3):
-        super().__init__()
-        self.original_loss = original_loss
-        self.model_wrapper = model_wrapper
-        self.alpha = alpha
-        self.beta = beta
+        # 7. Return loss dict with components for logging
+        # CRITICAL: Keep objective with gradients! Only detach logging components
+        loss_dict = original_loss_dict.copy()
+        loss_dict["objective"] = total_loss  # ← Must have gradients for backward()
         
-    def forward(self, student_pred, batch):
-        """Compute combined distillation + task loss"""
+        loss_dict["original_loss_component"] = original_loss_val.detach()  # ← Detach for logging only
+        loss_dict["feat_loss_component"] = feat_loss.detach()  # ← Detach for logging only
+        loss_dict["teacher_loss_component"] = teacher_loss_val.detach()  # ← Detach for logging only
         
-        # DEBUG: Check if student already ran
-        logger.info(f"DEBUG: student_pred keys: {student_pred.keys()}")
-        logger.info(f"DEBUG: student_feats before teacher run: {len(self.model_wrapper.student_extractor.features)}")
+        # Log per-layer feature losses for detailed monitoring
+        for layer_name, layer_loss in feat_losses.items():
+            # Sanitize layer name for logging (remove special chars)
+            clean_name = layer_name.replace('[', '_').replace(']', '').replace('.', '_')
+            loss_dict[f"feat_loss_{clean_name}"] = layer_loss.detach()
         
-        # Get features that were captured during student forward
-        student_feats = self.model_wrapper.student_extractor.get_features()
-        
-        logger.info(f"DEBUG: Retrieved {len(student_feats)} student features")
-        for name, feat in student_feats.items():
-            logger.info(f"  {name}: requires_grad={feat.requires_grad}")
-        
-        # Ensure we're in gradient context
-        with torch.set_grad_enabled(True):
-            # 1. Compute task loss (THIS should have gradients now)
-            task_loss_dict = self.original_loss(student_pred, batch)
-            task_loss = task_loss_dict["objective"]
-            
-            logger.info(f"DEBUG: task_loss requires_grad={task_loss.requires_grad}, grad_fn={task_loss.grad_fn}")
-            
-            # 2. Compute distillation loss
-            feat_loss = self.model_wrapper.compute_distillation_loss(student_pred, batch)
-            
-            logger.info(f"DEBUG: feat_loss requires_grad={feat_loss.requires_grad}, grad_fn={feat_loss.grad_fn}")
-            
-            # If task_loss doesn't have gradients but feat_loss does, 
-            # we can still train with just feature matching loss
-            if not task_loss.requires_grad:
-                logger.warning("WARNING: task_loss has no gradients!")
-                logger.warning("Using ONLY feature matching loss for training")
-                # Use only distillation loss
-                total_loss = feat_loss
-            else:
-                # 3. Combine both losses
-                total_loss = self.alpha * feat_loss + self.beta * task_loss
-            
-            logger.info(f"DEBUG: total_loss requires_grad={total_loss.requires_grad}, grad_fn={total_loss.grad_fn}")
-            
-            # 4. Return
-            loss_dict = task_loss_dict.copy()
-            loss_dict["objective"] = total_loss
-            loss_dict["task_loss_component"] = task_loss.detach() if task_loss.requires_grad else task_loss
-            loss_dict["feat_loss_component"] = feat_loss.detach()
-            
-            # CRITICAL: Verify before returning
-            logger.info(f"DEBUG LOSS_WRAPPER: Returning loss_dict['objective'] with requires_grad={loss_dict['objective'].requires_grad}")
-            logger.info(f"DEBUG LOSS_WRAPPER: loss_dict['objective'].grad_fn={loss_dict['objective'].grad_fn}")
-            
-            return loss_dict
+        return loss_dict
     
 class FeatureExtractor:
     def __init__(self, detach=True):
@@ -382,18 +319,19 @@ def unfreeze_layers(model, layer_names):
     logger.info(f"Unfrozen and set to train mode: {len(layer_names)} layers")
 
 
-def compute_feature_matching_loss(teacher_feats, student_feats):
+def compute_feature_matching_loss_per_layer(teacher_feats, student_feats):
     """
-    Compute feature matching loss between teacher and student
+    Compute feature matching loss between teacher and student (per-layer).
+    Returns a dict of losses for detailed monitoring.
     
     Args:
-        teacher_feats: Dict of teacher features
-        student_feats: Dict of student features
+        teacher_feats: Dict of teacher features {layer_name: tensor}
+        student_feats: Dict of student features {layer_name: tensor}
     
     Returns:
-        Combined feature matching loss
+        Dict of per-layer losses {layer_name: loss_tensor}
     """
-    losses = []
+    layer_losses = {}
     
     for name in teacher_feats.keys():
         if name not in student_feats:
@@ -422,25 +360,14 @@ def compute_feature_matching_loss(teacher_feats, student_feats):
         # MSE loss (scaled down)
         loss_mse = F.mse_loss(s_feat, t_feat)
         
-        # Combined loss
-        loss = loss_cos + 0.1 * loss_mse
-        losses.append(loss)
+        # Combined loss for this layer
+        layer_loss = loss_cos + 0.1 * loss_mse
+        layer_losses[name] = layer_loss
         
-        # Log per-feature loss for debugging
-        logger.debug(f"Feature {name}: cos_loss={loss_cos.item():.4f}, mse_loss={loss_mse.item():.4f}")
+        # Log per-layer loss for debugging
+        logger.debug(f"Layer {name}: cos_loss={loss_cos.item():.4f}, mse_loss={loss_mse.item():.4f}, total={layer_loss.item():.4f}")
     
-    if not losses:
-        # Find a device from any available tensor
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        for v in teacher_feats.values():
-            if isinstance(v, torch.Tensor):
-                device = v.device
-                break
-        return torch.tensor(0.0, device=device)
-    
-    total_loss = sum(losses) / len(losses)
-    logger.debug(f"Total feature matching loss: {total_loss.item():.4f} (from {len(losses)} features)")
-    return total_loss
+    return layer_losses
 
 def run_distill_vggt(rank, args):
 
@@ -458,359 +385,142 @@ def run_distill_vggt(rank, args):
     
     with initialize(version_base=None, config_path="models/depth/vggt/training/config"):
         cfg = compose(config_name="default")
-    
-    # CRITICAL: Memory optimization for distillation
+
     logger.info("Applying memory optimizations for distillation:")
-    # TEMPORARILY: Keep larger batch size to debug RoPE issue
-    # The issue might be related to how positions are generated for smaller batches
-    cfg.max_img_per_gpu = 48  # Keep original for now - TODO: reduce once RoPE is fixed
-    logger.info(f"  - TEMPORARILY keeping max_img_per_gpu at {cfg.max_img_per_gpu} to debug RoPE")
-    
-    cfg.accum_steps = 1  # Disable gradient accumulation temporarily
-    logger.info(f"  - TEMPORARILY disabled gradient accumulation: accum_steps = {cfg.accum_steps}")
-    
-    # CRITICAL: Disable AMP for distillation - it's causing gradient issues
-    cfg.optim.amp.enabled = False
-    logger.info(f"  - DISABLED AMP for distillation (was causing gradient detachment): {cfg.optim.amp.enabled}")
-    
-    # Reduce DDP bucket size for memory efficiency
-    if 'distributed' in cfg:
-        cfg.distributed.bucket_cap_mb = 10  # Reduce from 25 to 10 MB
-        logger.info(f"  - Reduced DDP bucket_cap_mb: 25 -> {cfg.distributed.bucket_cap_mb}")
-    
-    # Limit training batches during distillation
-    cfg.limit_train_batches = 400  # Reduce from 800
+    cfg.limit_train_batches = 400
     logger.info(f"  - Reduced limit_train_batches: 800 -> {cfg.limit_train_batches}")
     
-    # Add distillation loss keys to logging config
+    # default.yaml logging - add distillation loss to tensorboard
     if 'logging' in cfg and 'scalar_keys_to_log' in cfg['logging']:
         for phase in ['train', 'val']:
             if phase in cfg['logging']['scalar_keys_to_log']:
-                # Add distillation-specific loss keys
                 cfg['logging']['scalar_keys_to_log'][phase]['keys_to_log'].extend([
-                    'task_loss_component',  # Original task loss (for monitoring)
-                    'feat_loss_component',  # Feature matching loss (for monitoring)
+                    'original_loss_component',  # Original task loss (for monitoring)
+                    'feat_loss_component',  # Average feature matching loss (for monitoring)
+                    'teacher_loss_component',  # Teacher task loss (for monitoring)
+                    # Per-layer losses will be added dynamically based on hook_points
                 ])
                 logger.info(f"Added distillation loss keys to {phase} logging")
+                logger.info("  Note: Per-layer feature losses (feat_loss_<layer>) are logged automatically")
     
     logger.info("Creating student trainer (FP32)")
     student_trainer = Trainer(**cfg)
     student_model = student_trainer.model.module
-    
-    # CRITICAL: Reduce frames_chunk_size in depth_head to save memory
-    if hasattr(student_model, 'depth_head'):
-        original_chunk_size = 8  # default
-        reduced_chunk_size = 4   # reduce by half
-        # Monkey-patch the forward method to use smaller chunk size
-        original_depth_forward = student_model.depth_head.forward
-        def patched_depth_forward(aggregated_tokens_list, images, patch_start_idx, frames_chunk_size=reduced_chunk_size):
-            return original_depth_forward(aggregated_tokens_list, images, patch_start_idx, frames_chunk_size)
-        student_model.depth_head.forward = patched_depth_forward
-        logger.info(f"  - Reduced depth_head frames_chunk_size: {original_chunk_size} -> {reduced_chunk_size}")
 
-    # CRITICAL: Monkey-patch the _step method to ensure gradients
-    original_step = student_trainer._step
-
-    def patched_step(batch, model, phase, loss_meters):
-        """Force gradients during training and bypass original _step that may detach loss"""
-        if phase == 'train':
-            # Force enable gradients during training
-            with torch.enable_grad():
-                # Temporarily set model to train to ensure BN/Dropout work
-                was_training = model.training
-                model.train()
-                
-                # Forward pass
-                y_hat = model(images=batch["images"])
-                
-                # Loss computation
-                loss_dict = student_trainer.loss(y_hat, batch)
-                
-                # CRITICAL: Check loss IMMEDIATELY after computation
-                logger.info(f"DEBUG PATCHED_STEP: loss_dict['objective'] requires_grad={loss_dict['objective'].requires_grad}")
-                logger.info(f"DEBUG PATCHED_STEP: loss_dict['objective'] grad_fn={loss_dict['objective'].grad_fn}")
-                logger.info(f"DEBUG PATCHED_STEP: loss_dict['objective'].is_leaf={loss_dict['objective'].is_leaf}")
-                
-                if not was_training:
-                    model.eval()
-                
-                # Combine all data for logging (mimicking original _step behavior)
-                log_data = {**y_hat, **loss_dict, **batch}
-                
-                # Update metrics
-                student_trainer._update_and_log_scalars(
-                    log_data, phase, student_trainer.steps[phase], loss_meters
-                )
-                student_trainer._log_tb_visuals(log_data, phase, student_trainer.steps[phase])
-                
-                student_trainer.steps[phase] += 1
-                
-                # CRITICAL: Log right before returning
-                logger.info(f"DEBUG PATCHED_STEP FINAL: Returning loss_dict with objective.requires_grad={loss_dict['objective'].requires_grad}")
-                
-                return loss_dict
-        else:
-            # Validation - use original
-            return original_step(batch, model, phase, loss_meters)
-
-    student_trainer._step = patched_step
-    logger.info("✓ Patched trainer._step to force gradients and bypass potential detaching")
+    student_trainer.model.module.train()
+    torch.set_grad_enabled(True)
     
-    # CRITICAL: Patch _run_steps_on_batch_chunks to avoid in-place division that breaks gradients
-    original_run_steps = student_trainer._run_steps_on_batch_chunks
+    logger.info("Creating teacher model (FP32) - loading from state_dict instead of deepcopy")
+    from src.models.depth.vggt.vggt.models.vggt import VGGT
+    img_size = cfg.get('img_size', 518)
+    patch_size = cfg.get('patch_size', 14)
+    embed_dim = student_model.aggregator.camera_token.shape[-1]
     
-    def patched_run_steps(chunked_batches, phase, loss_meters):
-        """Patch to avoid in-place loss division that breaks gradients"""
-        import math
-        
-        accum_steps = len(chunked_batches)
-        
-        for i, chunked_batch in enumerate(chunked_batches):
-            # DEBUG: Check batch shapes before processing
-            logger.info(f"DEBUG BATCH: images.shape = {chunked_batch['images'].shape}")
-            
-            # CRITICAL: Debug positions tensor issue
-            if 'positions' in chunked_batch:
-                pos_data = chunked_batch['positions']
-                if hasattr(pos_data, 'shape'):
-                    logger.info(f"DEBUG BATCH: positions.shape = {pos_data.shape}")
-                    logger.info(f"DEBUG BATCH: positions.numel() = {pos_data.numel()}")
-                    if pos_data.numel() > 0:
-                        logger.info(f"DEBUG BATCH: positions min/max = {pos_data.min().item()}/{pos_data.max().item()}")
-                    else:
-                        logger.error(f"🚨 CRITICAL: positions tensor is EMPTY! This will cause RoPE to fail.")
-                        logger.error(f"   positions.shape = {pos_data.shape}")
-                        logger.error(f"   This might be due to batch size changes or data loading issues")
-                else:
-                    logger.info(f"DEBUG BATCH: positions = {str(pos_data)}")
-            else:
-                logger.warning("DEBUG BATCH: No 'positions' key found in batch!")
-                logger.info(f"DEBUG BATCH: Available keys: {list(chunked_batch.keys())}")
-            
-            # DON'T use autocast - it's breaking gradients!
-            # The model is already handling precision internally
-            try:
-                loss_dict = student_trainer._step(
-                    chunked_batch, student_trainer.model, phase, loss_meters
-                )
-            except RuntimeError as e:
-                if "max(): Expected reduction dim" in str(e):
-                    logger.error("🚨 RoPE Error: Empty positions tensor detected!")
-                    logger.error(f"   Batch shapes: images={chunked_batch['images'].shape}")
-                    if 'positions' in chunked_batch:
-                        logger.error(f"   positions.shape={chunked_batch['positions'].shape}")
-                    logger.error("   This is likely due to data loading or batch chunking issues")
-                    raise
-                else:
-                    raise
-            
-            loss = loss_dict["objective"]
-            logger.info(f"DEBUG AFTER EXTRACTION: loss.requires_grad={loss.requires_grad}, grad_fn={loss.grad_fn}")
-            
-            # CRITICAL: Do NOT clone! Cloning detaches gradients by default
-            # Work directly with the original tensor
-            
-            loss_key = f"Loss/{phase}_loss_objective"
-            batch_size = chunked_batch["images"].shape[0]
-            
-            # Check if finite
-            if not math.isfinite(loss.item()):
-                logger.error(f"Loss is {loss.item()}, attempting to stop training")
-                return
-            
-            # ✅ GRADIENT FLOW CONFIRMED WORKING! 
-            # Now implement proper gradient accumulation by scaling gradients AFTER backward
-            # instead of scaling loss BEFORE backward (which breaks gradients)
-            
-            if accum_steps > 1:
-                # Step 1: Do backward pass with original loss (preserves gradients)
-                loss.backward()
-                
-                # Step 2: Scale gradients after backward pass
-                # This is the correct way to do gradient accumulation
-                for param in student_trainer.model.parameters():
-                    if param.grad is not None:
-                        param.grad = param.grad / accum_steps
-                
-                logger.info(f"✅ Applied gradient accumulation: scaled gradients by 1/{accum_steps}")
-                loss_scaled = loss / accum_steps  # For logging only
-            else:
-                # No accumulation needed
-                loss.backward()
-                loss_scaled = loss
-                logger.info("✅ Single step backward (no gradient accumulation)")
-            
-            logger.info("✅ SUCCESS: Backward pass completed!")
-            loss_meters[loss_key].update(loss_scaled.item(), batch_size)
+    teacher_model = VGGT(
+        img_size=img_size,
+        patch_size=patch_size,
+        embed_dim=embed_dim,
+        enable_camera=(student_model.camera_head is not None),
+        enable_point=(student_model.point_head is not None),
+        enable_depth=(student_model.depth_head is not None),
+        enable_track=(student_model.track_head is not None)
+    ).to(student_trainer.device)
     
-    student_trainer._run_steps_on_batch_chunks = patched_run_steps
-    logger.info("✓ Patched trainer._run_steps_on_batch_chunks to use non-in-place division")
-
-    ###############################################
-    ## CHECKPOINT IS COMMENTED - MEANS IT'S ENABLED (MEMORY SAVING)
-    ## Uncomment below to DISABLE checkpoint (increases memory but fixes some gradient issues)
-    # import torch.utils.checkpoint as cp
-    # 
-    # def no_checkpoint(function, *args, **kwargs):
-    #     return function(*args, **kwargs)
-    # 
-    # # Disable globally
-    # cp.checkpoint = no_checkpoint
-    ##############################################
-    
-    # Helper function to log memory usage
-    def log_memory_usage(prefix=""):
-        if torch.cuda.is_available():
-            allocated = torch.cuda.memory_allocated(0) / (1024**3)  # GB
-            reserved = torch.cuda.memory_reserved(0) / (1024**3)    # GB
-            max_allocated = torch.cuda.max_memory_allocated(0) / (1024**3)  # GB
-            logger.info(f"{prefix}GPU Memory: {allocated:.2f} GB allocated, {reserved:.2f} GB reserved, {max_allocated:.2f} GB peak")
-            return allocated, reserved
-        return 0, 0
-    
-    logger.info("="*80)
-    logger.info("MEMORY OPTIMIZATIONS APPLIED:")
-    logger.info("  1. ✓ Gradient checkpointing ENABLED (saves ~30-40% memory)")
-    logger.info("  2. ✓ Teacher model on CPU, moved to GPU only during forward")
-    logger.info("  3. ✓ Batch size reduced: 48 -> 24 (50% less memory)")
-    logger.info("  4. ✓ Gradient accumulation enabled (accum_steps=2)")
-    logger.info("  5. ✗ AMP DISABLED (was causing gradient detachment in distillation)")
-    logger.info("  6. ✓ DDP bucket size reduced: 25 -> 10 MB")
-    logger.info("  7. ✓ Depth head chunk size reduced: 8 -> 4 frames")
-    logger.info("  8. ✓ Only trainable parameters have gradients computed")
-    logger.info("  9. ✗ torch.inference_mode() REMOVED (was creating inference tensors)")
-    logger.info(" 10. ✓ Immediate cache clearing after teacher forward")
-    logger.info("="*80)
-    
-    logger.info("Memory before creating teacher:")
-    log_memory_usage("  ")
-    
-    # CRITICAL: Don't store teacher in GPU memory, move to CPU after forward pass
-    logger.info("Creating teacher model (FP32) - will move to CPU to save GPU memory")
-    teacher_model = copy.deepcopy(student_model)
+    teacher_model.load_state_dict(student_model.state_dict())
     teacher_model.eval()
     for param in teacher_model.parameters():
         param.requires_grad = False
     
-    # Move teacher to CPU to save GPU memory (we'll move it back during forward)
-    teacher_model = teacher_model.cpu()
-    logger.info("✓ Teacher model moved to CPU")
-    
-    logger.info("Memory after creating teacher:")
-    teacher_mem_alloc, teacher_mem_reserved = log_memory_usage("  ")
-    
-    # Calculate teacher model size
-    teacher_params = sum(p.numel() * p.element_size() for p in teacher_model.parameters())
-    teacher_buffers = sum(b.numel() * b.element_size() for b in teacher_model.buffers())
-    teacher_size_gb = (teacher_params + teacher_buffers) / (1024**3)
-    logger.info(f"Teacher model size: {teacher_size_gb:.2f} GB ({teacher_params/1e6:.1f}M params)")
-    
-    # Save the original loss function
+    # Distill Single combined loss
     original_loss = student_trainer.loss
-    
-    # Get stage configuration
     stages, distill_alpha, distill_beta = get_config()
     
     for stage_idx, stage in enumerate(stages):
-        logger.info("="*80)
+        logger.info("="*50)
         logger.info(f"Stage {stage_idx + 1}/{len(stages)}: {stage['name']}")
         logger.info(f"Layers to quantize: {stage['layers']}")
-        logger.info("="*80)
+        logger.info("="*50)
         
         # 1. Quantize current stage layers
         logger.info(f"==> Quantizing stage {stage['name']} layers")
         student_model = selective_quantize_layers(student_model, args, stage['layers'])
-        # Re-setup gradient clipping for quantized layers (critical for correct clipping)
         student_trainer.gradient_clipper.setup_clipping(student_trainer.model)
         
-        # 2. Initialize quantization parameters
+        # 2. Initialize quantization parameters. Careful, grad is disabled here.
         if args.action == 'load':
-            logger.info("==> Initializing quantization parameters")
-            train_loader = student_trainer.train_dataset.get_loader(0)
-            stepsize_init(student_model, train_loader, args.device, 
-                         num_batches=args.init_num, dataset_name=args.dataset_name)
-        elif args.action == 'resume':
-            raise ValueError("Resuming not implemented yet for distillation")
-        
-        # 3. Freeze all layers except current stage
-        logger.info(f"==> Freezing all layers except current stage: {stage['name']}")
+            stepsize_init(student_trainer.model.module, student_trainer.train_dataset.get_loader(0), args.device, num_batches=args.init_num, dataset_name=args.dataset_name)
 
+        # 3. Expert approach: Enable gradient flow but only update quantized layers
+        logger.info(f"==> Setting up gradient flow for stage: {stage['name']}")
+        # Clear any existing gradients
         for param in student_model.parameters():
             if param.grad is not None:
                 param.grad = None
-        
+        # Keep ALL parameters with requires_grad=True for gradient flow
         for param in student_model.parameters():
-            param.requires_grad = False
+            param.requires_grad = True
         
-        unfreeze_layers(student_model, stage['layers'])
-        
-        trainable_params = sum(p.numel() for p in student_model.parameters() if p.requires_grad)
-        total_params = sum(p.numel() for p in student_model.parameters())
-        logger.info(f"Trainable: {trainable_params:,} / {total_params:,} ({100*trainable_params/total_params:.2f}%)")
-        
-        # CRITICAL: Set DDP to only reduce gradients for trainable parameters
-        if hasattr(student_trainer.model, 'module'):
-            # Rebuild DDP with only trainable params to save memory
-            logger.info("Configuring DDP to only sync trainable parameters")
-            student_trainer.model._set_static_graph()  # Static graph optimization
-        
-        logger.info("Memory before setting up extractors:")
-        log_memory_usage("  ")
-        
-        # 4. Setup feature extractors
+        # 4. Setup hooks for feature extraction
         teacher_extractor = FeatureExtractor(detach=True)
         student_extractor = FeatureExtractor(detach=False)
         teacher_extractor.register_hooks(teacher_model, stage['hook_points'])
         student_extractor.register_hooks(student_model, stage['hook_points'])
 
-        logger.info(f"DEBUG: Registered {len(teacher_extractor.hooks)} teacher hooks")
-        logger.info(f"DEBUG: Registered {len(student_extractor.hooks)} student hooks")
+        logger.info(f"Registered {len(teacher_extractor.hooks)} teacher hooks")
+        logger.info(f"Registered {len(student_extractor.hooks)} student hooks")
 
-        # 5. Wrap the model
-        model_wrapper = DistillationModelWrapper(
-            student_model, teacher_model,
-            original_loss,
+        # 5. Replace loss function with distillation loss
+        student_trainer.loss = DistillationLossWrapper(
+            original_loss, teacher_model,
             teacher_extractor, student_extractor,
             alpha=distill_alpha, beta=distill_beta
         )
-
-        # Replace trainer's model with wrapped version
-        student_trainer.model.module = model_wrapper
-
-        # 6. Replace loss function
-        student_trainer.loss = DistillationLossWrapper(
-            original_loss, model_wrapper,
-            alpha=distill_alpha, beta=distill_beta
-        )
         
-        # 7. Reconstruct optimizers for current stage
-        student_trainer.model.module = student_model
-        
+        # 6. Reconstruct optimizers for current stage
         if args.different_optimizer_mode:
-            # Takes freezed layers into account
-            sparams, params = split_params(
-                student_model, weight_decay=args.weight_decay, lr=args.lr,
-                x_lr=args.x_step_size_lr, w_lr=args.w_step_size_lr,
-                x_wd=args.x_step_size_wd, w_wd=args.w_step_size_wd
-            )
-
-            if len(sparams) > 0:
-                soptimizer, sscheduler = scheduler_optimizer_class(
-                    args, sparams, args.step_size_optimizer
-                )
-                student_trainer.s_optimizer = soptimizer
-                student_trainer.s_scheduler = sscheduler
-                logger.info(f"Scale optimizer created with {len(sparams)} parameter groups")
-            else:
-                student_trainer.s_optimizer = None
-                student_trainer.s_scheduler = None
-                logger.info("No trainable scale parameters found")
+            sparams, params = split_params(\
+                student_trainer.model.module, weight_decay=args.weight_decay, lr = args.lr, x_lr= args.x_step_size_lr, \
+                    w_lr= args.w_step_size_lr, x_wd = args.x_step_size_wd, w_wd = args.w_step_size_wd)
+            soptimizer, sscheduler = scheduler_optimizer_class(args, sparams, args.step_size_optimizer)
+            student_trainer.s_optimizer = soptimizer
+            student_trainer.s_scheduler = sscheduler
         
-        # Reconstruct main optimizer for all trainable parameters
-        # The original optimizer had all parameters
-        student_trainer.optims = construct_optimizers(
-            student_trainer.model, student_trainer.optim_conf
-        )
+        # Reconstruct optimizer to ONLY update current stage parameters
+        # Filter parameters: only those in current stage layers
+        stage_param_names = set()
+        for layer_name in stage['layers']:
+            for name, param in student_model.named_parameters():
+                if layer_name in name:
+                    stage_param_names.add(name)
+        
+        stage_params = [p for n, p in student_model.named_parameters() if n in stage_param_names]
+        stage_param_count = sum(p.numel() for p in stage_params)
+        logger.info(f"Optimizer will update {len(stage_params)} parameter tensors ({stage_param_count:,} values) from stage '{stage['name']}'")
+        
+        # Create optimizer using the original configuration but for stage parameters only
+        # This respects the optimizer type (AdamW, etc.) and other settings from config
+        from hydra.utils import instantiate
+        optimizer_conf = student_trainer.optim_conf.optimizer.copy()
+        # Override LR if specified in stage config
+        if 'lr' in stage:
+            optimizer_conf['lr'] = stage['lr']
+            
+        logger.info(f"Creating optimizer {optimizer_conf['_target_']} with lr={optimizer_conf['lr']}")
+        optimizer = instantiate(optimizer_conf, params=stage_params)
+        
+        # Wrap in the expected format
+        from collections import namedtuple
+        OptimWrapper = namedtuple('OptimWrapper', ['optimizer', 'schedulers', 'step_schedulers', 'zero_grad'])
+        student_trainer.optims = [
+            OptimWrapper(
+                optimizer=optimizer,
+                schedulers=[{}],  # No scheduler for now
+                step_schedulers=lambda x: None,  # No-op
+                # CRITICAL: Zero grad for the WHOLE model, not just optimizer params.
+                # Otherwise, gradients for non-updated layers will accumulate and break gradient clipping.
+                zero_grad=lambda **kwargs: student_model.zero_grad(**kwargs)
+            )
+        ]
         
         # 8. Train for this stage's epochs using Trainer.run_train()
         stage_max_epochs = student_trainer.epoch + stage['epochs']
@@ -820,13 +530,8 @@ def run_distill_vggt(rank, args):
         logger.info(f"==> Training stage {stage['name']} for {stage['epochs']} epochs")
         logger.info(f"    Epoch range: {student_trainer.epoch} -> {stage_max_epochs}")
         
-        logger.info("Memory before training:")
-        log_memory_usage("  ")
-        
+        torch.set_grad_enabled(True)
         student_trainer.run_train()
-        
-        logger.info("Memory after training stage:")
-        log_memory_usage("  ")
         
         # 9. Cleanup and restore
         student_trainer.max_epochs = original_max_epochs
@@ -837,62 +542,45 @@ def run_distill_vggt(rank, args):
         
         # Clear CUDA cache after stage
         torch.cuda.empty_cache()
-        logger.info("Memory after cleanup:")
-        log_memory_usage("  ")
         
         logger.info(f"==> Completed stage {stage['name']}")
     
     # 10. Final fine-tuning with all layers
-    # logger.info("="*80)
-    # logger.info("==> Final fine-tuning with all layers unfrozen")
-    # logger.info("="*80)
-    # 
-    # # Unfreeze all layers
-    # for param in student_model.parameters():
-    #     param.requires_grad = True
-    # student_model.train()
-    # 
-    # # Restore task-only loss (no distillation)
-    # student_trainer.loss = original_loss
-    # 
-    # # Reconstruct optimizers for full model
-    # student_trainer.optims = construct_optimizers(
-    #     student_trainer.model, student_trainer.optim_conf
-    # )
-    # 
-    # # Final training
-    # student_trainer.run_train()
-    
     logger.info("==> Distillation complete!")
     
 
 def get_config():
-    distill_alpha = 0.7
-    distill_beta = 0.3
+    # Distillation loss weights (all layers trainable, no freezing)
+    # Feature loss: matches intermediate representations from teacher
+    # Task loss: ensures final output solves the actual task correctly
+    distill_alpha = 0.7 # feature loss weight
+    distill_beta = 0.3  # task loss weight
+    
     stages = [
         {
             "name": "patch_embed",
             "layers": ["aggregator.patch_embed"],
             "hook_points": ["aggregator.patch_embed.patch_embed.proj"],
-            "epochs": 10,
-            "lr": 1e-4
+            "epochs": 4,
+            "lr": 1e-7
         },
-        # {
-        #     "name": "blocks_0_5",
-        #     "layers": [
-        #         "aggregator.frame_blocks.0", "aggregator.frame_blocks.1", 
-        #         "aggregator.frame_blocks.2", "aggregator.frame_blocks.3",
-        #         "aggregator.frame_blocks.4", "aggregator.frame_blocks.5",
-        #         "aggregator.global_blocks.0", "aggregator.global_blocks.1",
-        #         "aggregator.global_blocks.2", "aggregator.global_blocks.3",
-        #         "aggregator.global_blocks.4", "aggregator.global_blocks.5"
-        #     ],
-        #     "hook_points": [
-        #         "aggregator.frame_blocks[5]",
-        #         "aggregator.global_blocks[5]"
-        #     ],
-        #     "epochs": 8
-        # },
+        {
+            "name": "blocks_0_5",
+            "layers": [
+                "aggregator.frame_blocks.0", "aggregator.frame_blocks.1", 
+                "aggregator.frame_blocks.2", "aggregator.frame_blocks.3",
+                "aggregator.frame_blocks.4", "aggregator.frame_blocks.5",
+                "aggregator.global_blocks.0", "aggregator.global_blocks.1",
+                "aggregator.global_blocks.2", "aggregator.global_blocks.3",
+                "aggregator.global_blocks.4", "aggregator.global_blocks.5"
+            ],
+            "hook_points": [
+                "aggregator.frame_blocks[5]",
+                "aggregator.global_blocks[5]"
+            ],
+            "epochs": 4,
+            "lr": 1e-7
+        },
         # {
         #     "name": "blocks_6_11",
         #     "layers": [
