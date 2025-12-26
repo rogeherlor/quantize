@@ -37,16 +37,17 @@ def run_evaluation_vggt(model, model_path=None):
     set_random_seeds(args.seed)
 
     # Categories to evaluate
-    SEEN_CATEGORIES = [
-        "apple", "backpack", "banana", "baseballbat", "baseballglove",
-        "bench", "bicycle", "bottle", "bowl", "broccoli",
-        "cake", "car", "carrot", "cellphone", "chair",
-        "cup", "donut", "hairdryer", "handbag", "hydrant",
-        "keyboard", "laptop", "microwave", "motorcycle", "mouse",
-        "orange", "parkingmeter", "pizza", "plant", "stopsign",
-        "teddybear", "toaster", "toilet", "toybus", "toyplane",
-        "toytrain", "toytruck", "tv", "umbrella", "vase", "wineglass",
-    ]
+    # SEEN_CATEGORIES = [
+    #     "apple", "backpack", "banana", "baseballbat", "baseballglove",
+    #     "bench", "bicycle", "bottle", "bowl", "broccoli",
+    #     "cake", "car", "carrot", "cellphone", "chair",
+    #     "cup", "donut", "hairdryer", "handbag", "hydrant",
+    #     "keyboard", "laptop", "microwave", "motorcycle", "mouse",
+    #     "orange", "parkingmeter", "pizza", "plant", "stopsign",
+    #     "teddybear", "toaster", "toilet", "toybus", "toyplane",
+    #     "toytrain", "toytruck", "tv", "umbrella", "vase", "wineglass",
+    # ]
+    SEEN_CATEGORIES = ["apple"]
 
     if args.debug:
         SEEN_CATEGORIES = ["parkingmeter"]
@@ -54,7 +55,7 @@ def run_evaluation_vggt(model, model_path=None):
     per_category_results = {}
 
     for category in SEEN_CATEGORIES:
-        print(f"Loading annotation for {category} test set")
+        logger.info(f"Loading annotation for {category} test set")
         annotation_file = os.path.join(args.co3d_anno_dir, f"{category}_test.jgz")
 
         try:
@@ -73,15 +74,15 @@ def run_evaluation_vggt(model, model_path=None):
         seq_names = sorted(seq_names)
 
 
-        print("Testing Sequences: ")
-        print(seq_names)
+        logger.info("Testing Sequences: ")
+        logger.info(seq_names)
 
         for seq_name in seq_names:
             seq_data = annotation[seq_name]
-            print("-" * 50)
-            print(f"Processing {seq_name} for {category} test set")
+            logger.info("-" * 50)
+            logger.info(f"Processing {seq_name} for {category} test set")
             if args.debug and not os.path.exists(os.path.join(args.co3d_dir, category, seq_name)):
-                print(f"Skipping {seq_name} (not found)")
+                logger.info(f"Skipping {seq_name} (not found)")
                 continue
 
             seq_rError, seq_tError = process_sequence(
@@ -89,14 +90,14 @@ def run_evaluation_vggt(model, model_path=None):
                 args.min_num_images, args.num_frames, args.use_ba, device, dtype,
             )
 
-            print("-" * 50)
+            logger.info("-" * 50)
 
             if seq_rError is not None and seq_tError is not None:
                 rError.extend(seq_rError)
                 tError.extend(seq_tError)
 
         if not rError:
-            print(f"No valid sequences found for {category}, skipping")
+            logger.info(f"No valid sequences found for {category}, skipping")
             continue
 
         rError = np.array(rError)
@@ -116,7 +117,7 @@ def run_evaluation_vggt(model, model_path=None):
             "Auc_3": Auc_3
         }
 
-        print("="*80)
+        logger.info("="*80)
         # Print results with colors
         GREEN = "\033[92m"
         RED = "\033[91m"
@@ -124,27 +125,27 @@ def run_evaluation_vggt(model, model_path=None):
         BOLD = "\033[1m"
         RESET = "\033[0m"
 
-        print(f"{BOLD}{BLUE}AUC of {category} test set:{RESET} {GREEN}{Auc_30:.4f} (AUC@30), {Auc_15:.4f} (AUC@15), {Auc_5:.4f} (AUC@5), {Auc_3:.4f} (AUC@3){RESET}")
+        logger.info(f"{BOLD}{BLUE}AUC of {category} test set:{RESET} {GREEN}{Auc_30:.4f} (AUC@30), {Auc_15:.4f} (AUC@15), {Auc_5:.4f} (AUC@5), {Auc_3:.4f} (AUC@3){RESET}")
         mean_AUC_30_by_now = np.mean([per_category_results[category]["Auc_30"] for category in per_category_results])
         mean_AUC_15_by_now = np.mean([per_category_results[category]["Auc_15"] for category in per_category_results])
         mean_AUC_5_by_now = np.mean([per_category_results[category]["Auc_5"] for category in per_category_results])
         mean_AUC_3_by_now = np.mean([per_category_results[category]["Auc_3"] for category in per_category_results])
-        print(f"{BOLD}{BLUE}Mean AUC of categories by now:{RESET} {RED}{mean_AUC_30_by_now:.4f} (AUC@30), {mean_AUC_15_by_now:.4f} (AUC@15), {mean_AUC_5_by_now:.4f} (AUC@5), {mean_AUC_3_by_now:.4f} (AUC@3){RESET}")
-        print("="*80)
+        logger.info(f"{BOLD}{BLUE}Mean AUC of categories by now:{RESET} {RED}{mean_AUC_30_by_now:.4f} (AUC@30), {mean_AUC_15_by_now:.4f} (AUC@15), {mean_AUC_5_by_now:.4f} (AUC@5), {mean_AUC_3_by_now:.4f} (AUC@3){RESET}")
+        logger.info("="*80)
 
     # Print summary results
-    print("\nSummary of AUC results:")
-    print("-"*50)
+    logger.info("\nSummary of AUC results:")
+    logger.info("-"*50)
     for category in sorted(per_category_results.keys()):
-        print(f"{category:<15}: {per_category_results[category]['Auc_30']:.4f} (AUC@30), {per_category_results[category]['Auc_15']:.4f} (AUC@15), {per_category_results[category]['Auc_5']:.4f} (AUC@5), {per_category_results[category]['Auc_3']:.4f} (AUC@3)")
+        logger.info(f"{category:<15}: {per_category_results[category]['Auc_30']:.4f} (AUC@30), {per_category_results[category]['Auc_15']:.4f} (AUC@15), {per_category_results[category]['Auc_5']:.4f} (AUC@5), {per_category_results[category]['Auc_3']:.4f} (AUC@3)")
 
     if per_category_results:
         mean_AUC_30 = np.mean([per_category_results[category]["Auc_30"] for category in per_category_results])
         mean_AUC_15 = np.mean([per_category_results[category]["Auc_15"] for category in per_category_results])
         mean_AUC_5 = np.mean([per_category_results[category]["Auc_5"] for category in per_category_results])
         mean_AUC_3 = np.mean([per_category_results[category]["Auc_3"] for category in per_category_results])
-        print("-"*50)
-        print(f"Mean AUC: {mean_AUC_30:.4f} (AUC@30), {mean_AUC_15:.4f} (AUC@15), {mean_AUC_5:.4f} (AUC@5), {mean_AUC_3:.4f} (AUC@3)")
+        logger.info("-"*50)
+        logger.info(f"Mean AUC: {mean_AUC_30:.4f} (AUC@30), {mean_AUC_15:.4f} (AUC@15), {mean_AUC_5:.4f} (AUC@5), {mean_AUC_3:.4f} (AUC@3)")
     
 
 def run_test_vggt(args):

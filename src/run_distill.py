@@ -22,6 +22,7 @@ from src.make_ex_name import *
 
 from src.models.depth.vggt.evaluation.test_co3d import *
 
+from src.models.depth.qvggt import run_evaluation_vggt
 
 class DistillationLossWrapper(nn.Module):
     """
@@ -259,66 +260,6 @@ def selective_quantize_layers(model, args, layer_names):
     
     return model
 
-
-def freeze_layers(model, layer_names):
-    """Freeze specified layers"""
-    for layer_name in layer_names:
-        parts = layer_name.split('.')
-        module = model
-        
-        for part in parts:
-            if '[' in part and ']' in part:
-                attr_name, idx = part.split('[')
-                idx = int(idx.rstrip(']'))
-                module = getattr(module, attr_name)[idx]
-            else:
-                module = getattr(module, part)
-        
-        for param in module.parameters():
-            param.requires_grad = False
-    
-    logger.info(f"Frozen {len(layer_names)} layers")
-
-
-def unfreeze_layers(model, layer_names):
-    """
-    Unfreeze specified layers and set them to train mode.
-    
-    This function:
-    1. Navigates to each layer in the model hierarchy
-    2. Sets the layer to train mode (enables BatchNorm updates, Dropout, etc.)
-    3. Unfreezes all parameters in that layer recursively
-    
-    Args:
-        model: The PyTorch model
-        layer_names: List of layer names to unfreeze (e.g., ["aggregator.patch_embed"])
-    """
-    for layer_name in layer_names:
-        parts = layer_name.split('.')
-        module = model
-        
-        # Navigate to the target module
-        for part in parts:
-            if '[' in part and ']' in part:
-                # Handle array indexing like "frame_blocks[0]"
-                attr_name, idx = part.split('[')
-                idx = int(idx.rstrip(']'))
-                module = getattr(module, attr_name)[idx]
-            else:
-                module = getattr(module, part)
-        
-        # Set to train mode (affects BatchNorm, Dropout, etc.)
-        logger.info(f"Module {layer_name} training mode BEFORE: {module.training}")
-        module.train()
-        logger.info(f"Module {layer_name} training mode AFTER: {module.training}")
-        
-        # Unfreeze all parameters recursively
-        for param in module.parameters():
-            param.requires_grad = True
-    
-    logger.info(f"Unfrozen and set to train mode: {len(layer_names)} layers")
-
-
 def compute_feature_matching_loss_per_layer(teacher_feats, student_feats):
     """
     Compute feature matching loss between teacher and student (per-layer).
@@ -388,17 +329,18 @@ def run_distill_vggt(rank, args):
 
     logger.info("Applying memory optimizations for distillation:")
     cfg.limit_train_batches = 400
+    cfg.limit_val_batches = 100
     logger.info(f"  - Reduced limit_train_batches: 800 -> {cfg.limit_train_batches}")
+    logger.info(f"  - Reduced limit_val_batches: 400 -> {cfg.limit_val_batches}")
     
     # default.yaml logging - add distillation loss to tensorboard
     if 'logging' in cfg and 'scalar_keys_to_log' in cfg['logging']:
         for phase in ['train', 'val']:
             if phase in cfg['logging']['scalar_keys_to_log']:
                 cfg['logging']['scalar_keys_to_log'][phase]['keys_to_log'].extend([
-                    'original_loss_component',  # Original task loss (for monitoring)
-                    'feat_loss_component',  # Average feature matching loss (for monitoring)
-                    'teacher_loss_component',  # Teacher task loss (for monitoring)
-                    # Per-layer losses will be added dynamically based on hook_points
+                    'original_loss_component',  # Original loss
+                    'feat_loss_component',  # Average feature matching loss
+                    'teacher_loss_component',  # Teacher original loss
                 ])
                 logger.info(f"Added distillation loss keys to {phase} logging")
                 logger.info("  Note: Per-layer feature losses (feat_loss_<layer>) are logged automatically")
@@ -459,6 +401,21 @@ def run_distill_vggt(rank, args):
         # Keep ALL parameters with requires_grad=True for gradient flow
         for param in student_model.parameters():
             param.requires_grad = True
+
+        logger.info(f"Layer status for stage {stage['name']}:")
+        
+        # Log grad status for each layer
+        logger.info(student_trainer.model.module)
+        param_to_class = {}
+        for m_name, m in student_model.named_modules():
+            for p_name, _ in m.named_parameters(recurse=False):
+                full_name = f"{m_name}.{p_name}" if m_name else p_name
+                param_to_class[full_name] = m.__class__.__name__
+        for name, param in student_model.named_parameters():
+            is_updated = any(layer_name in name for layer_name in stage['layers'])
+            status = "Trainable" if is_updated else "Frozen (Gradient Flow Only)"
+            class_name = param_to_class.get(name, "Unknown")
+            logger.info(f"  {name} [{class_name}]: {status} | requires_grad={param.requires_grad}")
         
         # 4. Setup hooks for feature extraction
         teacher_extractor = FeatureExtractor(detach=True)
@@ -540,8 +497,12 @@ def run_distill_vggt(rank, args):
         
         student_trainer.loss = original_loss
         
-        # Clear CUDA cache after stage
         torch.cuda.empty_cache()
+
+        student_trainer.model.module.eval()
+        run_evaluation_vggt(student_trainer.model.module)
+        run_evaluation_vggt(teacher_model)
+        student_trainer.model.module.train()
         
         logger.info(f"==> Completed stage {stage['name']}")
     
@@ -559,10 +520,10 @@ def get_config():
     stages = [
         {
             "name": "patch_embed",
-            "layers": ["aggregator.patch_embed"],
+            "layers": ["aggregator.patch_embed"], # all blocks inside patch_embed
             "hook_points": ["aggregator.patch_embed.patch_embed.proj"],
-            "epochs": 4,
-            "lr": 1e-7
+            "epochs": 20,
+            "lr": 1e-6
         },
         {
             "name": "blocks_0_5",
@@ -578,63 +539,67 @@ def get_config():
                 "aggregator.frame_blocks[5]",
                 "aggregator.global_blocks[5]"
             ],
-            "epochs": 4,
-            "lr": 1e-7
+            "epochs": 20,
+            "lr": 1e-6
         },
-        # {
-        #     "name": "blocks_6_11",
-        #     "layers": [
-        #         "aggregator.frame_blocks.6", "aggregator.frame_blocks.7",
-        #         "aggregator.frame_blocks.8", "aggregator.frame_blocks.9",
-        #         "aggregator.frame_blocks.10", "aggregator.frame_blocks.11",
-        #         "aggregator.global_blocks.6", "aggregator.global_blocks.7",
-        #         "aggregator.global_blocks.8", "aggregator.global_blocks.9",
-        #         "aggregator.global_blocks.10", "aggregator.global_blocks.11"
-        #     ],
-        #     "hook_points": [
-        #         "aggregator.frame_blocks[11]",
-        #         "aggregator.global_blocks[11]"
-        #     ],
-        #     "epochs": 8
-        # },
-        # {
-        #     "name": "blocks_12_17",
-        #     "layers": [
-        #         "aggregator.frame_blocks.12", "aggregator.frame_blocks.13",
-        #         "aggregator.frame_blocks.14", "aggregator.frame_blocks.15",
-        #         "aggregator.frame_blocks.16", "aggregator.frame_blocks.17",
-        #         "aggregator.global_blocks.12", "aggregator.global_blocks.13",
-        #         "aggregator.global_blocks.14", "aggregator.global_blocks.15",
-        #         "aggregator.global_blocks.16", "aggregator.global_blocks.17"
-        #     ],
-        #     "hook_points": [
-        #         "aggregator.frame_blocks[17]",
-        #         "aggregator.global_blocks[17]"
-        #     ],
-        #     "epochs": 8
-        # },
-        # {
-        #     "name": "blocks_18_23",
-        #     "layers": [
-        #         "aggregator.frame_blocks.18", "aggregator.frame_blocks.19",
-        #         "aggregator.frame_blocks.20", "aggregator.frame_blocks.21",
-        #         "aggregator.frame_blocks.22", "aggregator.frame_blocks.23",
-        #         "aggregator.global_blocks.18", "aggregator.global_blocks.19",
-        #         "aggregator.global_blocks.20", "aggregator.global_blocks.21",
-        #         "aggregator.global_blocks.22", "aggregator.global_blocks.23"
-        #     ],
-        #     "hook_points": [
-        #         "aggregator.frame_blocks[23]",
-        #         "aggregator.global_blocks[23]"
-        #     ],
-        #     "epochs": 8
-        # },
-        # {
-        #     "name": "heads",
-        #     "layers": ["camera_head", "depth_head"],
-        #     "hook_points": ["camera_head", "depth_head"],
-        #     "epochs": 10
-        # }
+        {
+            "name": "blocks_6_11",
+            "layers": [
+                "aggregator.frame_blocks.6", "aggregator.frame_blocks.7",
+                "aggregator.frame_blocks.8", "aggregator.frame_blocks.9",
+                "aggregator.frame_blocks.10", "aggregator.frame_blocks.11",
+                "aggregator.global_blocks.6", "aggregator.global_blocks.7",
+                "aggregator.global_blocks.8", "aggregator.global_blocks.9",
+                "aggregator.global_blocks.10", "aggregator.global_blocks.11"
+            ],
+            "hook_points": [
+                "aggregator.frame_blocks[11]",
+                "aggregator.global_blocks[11]"
+            ],
+            "epochs": 20,
+            "lr": 1e-6
+        },
+        {
+            "name": "blocks_12_17",
+            "layers": [
+                "aggregator.frame_blocks.12", "aggregator.frame_blocks.13",
+                "aggregator.frame_blocks.14", "aggregator.frame_blocks.15",
+                "aggregator.frame_blocks.16", "aggregator.frame_blocks.17",
+                "aggregator.global_blocks.12", "aggregator.global_blocks.13",
+                "aggregator.global_blocks.14", "aggregator.global_blocks.15",
+                "aggregator.global_blocks.16", "aggregator.global_blocks.17"
+            ],
+            "hook_points": [
+                "aggregator.frame_blocks[17]",
+                "aggregator.global_blocks[17]"
+            ],
+            "epochs": 20,
+            "lr": 1e-6
+        },
+        {
+            "name": "blocks_18_23",
+            "layers": [
+                "aggregator.frame_blocks.18", "aggregator.frame_blocks.19",
+                "aggregator.frame_blocks.20", "aggregator.frame_blocks.21",
+                "aggregator.frame_blocks.22", "aggregator.frame_blocks.23",
+                "aggregator.global_blocks.18", "aggregator.global_blocks.19",
+                "aggregator.global_blocks.20", "aggregator.global_blocks.21",
+                "aggregator.global_blocks.22", "aggregator.global_blocks.23"
+            ],
+            "hook_points": [
+                "aggregator.frame_blocks[23]",
+                "aggregator.global_blocks[23]"
+            ],
+            "epochs": 20,
+            "lr": 1e-6
+        },
+        {
+            "name": "heads",
+            "layers": ["camera_head", "depth_head"],
+            "hook_points": ["camera_head", "depth_head"],
+            "epochs": 20,
+            "lr": 1e-6
+        }
     ]
     return stages, distill_alpha, distill_beta
 
