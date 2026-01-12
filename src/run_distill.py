@@ -26,12 +26,12 @@ from src.models.depth.qvggt import run_evaluation_vggt
 
 class DistillationLossWrapper(nn.Module):
     """
-    Simple distillation loss: original_loss + feature_matching_loss
+    Simple distillation loss: task_loss + feature_matching_loss
     Standard practice - teacher stays on GPU, uses @torch.no_grad()
     """
-    def __init__(self, original_loss, teacher_model, teacher_extractor, student_extractor, alpha=0.7, beta=0.3):
+    def __init__(self, task_loss, teacher_model, teacher_extractor, student_extractor, alpha=0.7, beta=0.3):
         super().__init__()
-        self.original_loss = original_loss
+        self.task_loss = task_loss
         self.teacher_model = teacher_model
         self.teacher_extractor = teacher_extractor
         self.student_extractor = student_extractor
@@ -42,8 +42,8 @@ class DistillationLossWrapper(nn.Module):
         """Compute combined distillation + original loss"""
         
         # 1. Compute original loss from original loss function
-        original_loss_dict = self.original_loss(student_pred, batch)
-        original_loss_val = original_loss_dict["objective"]
+        task_loss_dict = self.task_loss(student_pred, batch)
+        task_loss_val = task_loss_dict["objective"]
         
         # 2. Get student features (already captured during forward)
         student_feats = self.student_extractor.get_features()
@@ -53,7 +53,7 @@ class DistillationLossWrapper(nn.Module):
             teacher_pred = self.teacher_model(images=batch["images"])
             
             # Compute teacher loss for monitoring
-            teacher_loss_dict = self.original_loss(teacher_pred, batch)
+            teacher_loss_dict = self.task_loss(teacher_pred, batch)
             teacher_loss_val = teacher_loss_dict["objective"]
         
         teacher_feats = self.teacher_extractor.get_features()
@@ -62,14 +62,14 @@ class DistillationLossWrapper(nn.Module):
         if student_feats and teacher_feats:
             feat_losses = compute_feature_matching_loss_per_layer(teacher_feats, student_feats)
             # Average per-layer losses or fallback to zero connected to graph
-            feat_loss = sum(feat_losses.values()) / len(feat_losses) if feat_losses else original_loss_val * 0.0
+            feat_loss = sum(feat_losses.values()) / len(feat_losses) if feat_losses else task_loss_val * 0.0
         else:
             feat_losses = {}
-            # CRITICAL: Use original_loss_val * 0.0 instead of torch.tensor() to maintain computation graph
-            feat_loss = original_loss_val * 0.0
+            # CRITICAL: Use task_loss_val * 0.0 instead of torch.tensor() to maintain computation graph
+            feat_loss = task_loss_val * 0.0
         
         # 5. Combine losses
-        total_loss = self.alpha * feat_loss + self.beta * original_loss_val
+        total_loss = self.alpha * feat_loss + self.beta * task_loss_val
         
         # 6. Clear features for next iteration
         self.teacher_extractor.features = {}
@@ -77,10 +77,10 @@ class DistillationLossWrapper(nn.Module):
         
         # 7. Return loss dict with components for logging
         # CRITICAL: Keep objective with gradients! Only detach logging components
-        loss_dict = original_loss_dict.copy()
+        loss_dict = task_loss_dict.copy()
         loss_dict["objective"] = total_loss  # ← Must have gradients for backward()
         
-        loss_dict["original_loss_component"] = original_loss_val.detach()  # ← Detach for logging only
+        loss_dict["task_loss_component"] = task_loss_val.detach()  # ← Detach for logging only
         loss_dict["feat_loss_component"] = feat_loss.detach()  # ← Detach for logging only
         loss_dict["teacher_loss_component"] = teacher_loss_val.detach()  # ← Detach for logging only
         
@@ -137,6 +137,12 @@ class FeatureExtractor:
                     feature = output[2]
                 else:
                     feature = output[0]
+            elif isinstance(output, list):
+                # Handle list outputs (e.g. camera_head returns list of pose encodings)
+                if len(output) > 0:
+                    feature = output[-1]
+                else:
+                    return
             elif isinstance(output, dict):
                 # Handle dict outputs from other modules
                 feature = None
@@ -338,7 +344,7 @@ def run_distill_vggt(rank, args):
         for phase in ['train', 'val']:
             if phase in cfg['logging']['scalar_keys_to_log']:
                 cfg['logging']['scalar_keys_to_log'][phase]['keys_to_log'].extend([
-                    'original_loss_component',  # Original loss
+                    'task_loss_component',  # Original loss
                     'feat_loss_component',  # Average feature matching loss
                     'teacher_loss_component',  # Teacher original loss
                 ])
@@ -372,9 +378,11 @@ def run_distill_vggt(rank, args):
     teacher_model.eval()
     for param in teacher_model.parameters():
         param.requires_grad = False
+
+    run_evaluation_vggt(teacher_model)
     
     # Distill Single combined loss
-    original_loss = student_trainer.loss
+    task_loss = student_trainer.loss
     stages, distill_alpha, distill_beta = get_config()
     
     for stage_idx, stage in enumerate(stages):
@@ -428,7 +436,7 @@ def run_distill_vggt(rank, args):
 
         # 5. Replace loss function with distillation loss
         student_trainer.loss = DistillationLossWrapper(
-            original_loss, teacher_model,
+            task_loss, teacher_model,
             teacher_extractor, student_extractor,
             alpha=distill_alpha, beta=distill_beta
         )
@@ -495,14 +503,9 @@ def run_distill_vggt(rank, args):
         teacher_extractor.clear_hooks()
         student_extractor.clear_hooks()
         
-        student_trainer.loss = original_loss
+        student_trainer.loss = task_loss
         
         torch.cuda.empty_cache()
-
-        student_trainer.model.module.eval()
-        run_evaluation_vggt(student_trainer.model.module)
-        run_evaluation_vggt(teacher_model)
-        student_trainer.model.module.train()
         
         logger.info(f"==> Completed stage {stage['name']}")
     
@@ -522,7 +525,7 @@ def get_config():
             "name": "patch_embed",
             "layers": ["aggregator.patch_embed"], # all blocks inside patch_embed
             "hook_points": ["aggregator.patch_embed.patch_embed.proj"],
-            "epochs": 20,
+            "epochs": 10,
             "lr": 1e-6
         },
         {
@@ -539,13 +542,13 @@ def get_config():
                 "aggregator.frame_blocks[5]",
                 "aggregator.global_blocks[5]"
             ],
-            "epochs": 20,
+            "epochs": 10,
             "lr": 1e-6
         },
         {
             "name": "blocks_6_11",
             "layers": [
-                "aggregator.frame_blocks.6", "aggregator.frame_blocks.7",
+                "aggregator.frame_blocks.6", "aggregator.frame_blocks.7", 
                 "aggregator.frame_blocks.8", "aggregator.frame_blocks.9",
                 "aggregator.frame_blocks.10", "aggregator.frame_blocks.11",
                 "aggregator.global_blocks.6", "aggregator.global_blocks.7",
@@ -556,13 +559,13 @@ def get_config():
                 "aggregator.frame_blocks[11]",
                 "aggregator.global_blocks[11]"
             ],
-            "epochs": 20,
-            "lr": 1e-6
+            "epochs": 10,
+            "lr": 1e-7
         },
         {
             "name": "blocks_12_17",
             "layers": [
-                "aggregator.frame_blocks.12", "aggregator.frame_blocks.13",
+                "aggregator.frame_blocks.12", "aggregator.frame_blocks.13", 
                 "aggregator.frame_blocks.14", "aggregator.frame_blocks.15",
                 "aggregator.frame_blocks.16", "aggregator.frame_blocks.17",
                 "aggregator.global_blocks.12", "aggregator.global_blocks.13",
@@ -573,13 +576,13 @@ def get_config():
                 "aggregator.frame_blocks[17]",
                 "aggregator.global_blocks[17]"
             ],
-            "epochs": 20,
+            "epochs": 10,
             "lr": 1e-6
         },
         {
             "name": "blocks_18_23",
             "layers": [
-                "aggregator.frame_blocks.18", "aggregator.frame_blocks.19",
+                "aggregator.frame_blocks.18", "aggregator.frame_blocks.19", 
                 "aggregator.frame_blocks.20", "aggregator.frame_blocks.21",
                 "aggregator.frame_blocks.22", "aggregator.frame_blocks.23",
                 "aggregator.global_blocks.18", "aggregator.global_blocks.19",
@@ -590,15 +593,33 @@ def get_config():
                 "aggregator.frame_blocks[23]",
                 "aggregator.global_blocks[23]"
             ],
-            "epochs": 20,
+            "epochs": 10,
             "lr": 1e-6
         },
         {
-            "name": "heads",
-            "layers": ["camera_head", "depth_head"],
-            "hook_points": ["camera_head", "depth_head"],
-            "epochs": 20,
-            "lr": 1e-6
+           "name": "block_all_attn",
+           "layers": [
+               "aggregator.frame_blocks.0.attn",
+           ],
+           "hook_points": [
+               "aggregator.frame_blocks[0].mlp.fc2"
+           ],
+           "epochs": 4,
+           "lr": 1e-6
+        },
+        {
+            "name": "head2",
+            "layers": ["depth_head"],
+            "hook_points": ["depth_head"],
+            "epochs": 10,
+            "lr": 1e-7
+        },
+        {
+            "name": "head1",
+            "layers": ["camera_head"],
+            "hook_points": ["camera_head"],
+            "epochs": 10,
+            "lr": 1e-7
         }
     ]
     return stages, distill_alpha, distill_beta

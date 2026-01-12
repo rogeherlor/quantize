@@ -3,6 +3,7 @@ import time
 import shutil
 import numpy as np
 import torch
+import torch.nn as nn
 import gc
 from collections import defaultdict
 import random
@@ -10,7 +11,7 @@ import random
 from src.logger import logger
 
 from src.run_qat import run_load_model
-from src.utils import setup_dataloader
+from src.utils import setup_dataloader, stepsize_init
 from src.make_ex_name import *
 from src.models.model import create_model
 from src.quantizer.uniform.lsq import LSQ_quantizer
@@ -38,11 +39,20 @@ class StatsCollector:
         if name not in self.static_stats and tensor is not None and tensor.numel() > 0:
             with torch.no_grad():
                 flat_tensor = tensor.flatten()
+                
+                # Optimization: Compute all stats on GPU and transfer once
+                mean_t = torch.mean(flat_tensor)
+                std_t = torch.std(flat_tensor)
+                min_t = torch.min(flat_tensor)
+                max_t = torch.max(flat_tensor)
+                
+                stats = torch.stack([mean_t, std_t, min_t, max_t]).cpu().numpy()
+                
                 self.static_stats[name] = {
-                    'mean': float(torch.mean(flat_tensor).cpu()),
-                    'std': float(torch.std(flat_tensor).cpu()),
-                    'min': float(torch.min(flat_tensor).cpu()),
-                    'max': float(torch.max(flat_tensor).cpu()),
+                    'mean': float(stats[0]),
+                    'std': float(stats[1]),
+                    'min': float(stats[2]),
+                    'max': float(stats[3]),
                     'shape': list(tensor.shape),
                     'numel': tensor.numel(),
                     'samples': self._sample_tensor(flat_tensor)  # Small sample for histograms
@@ -54,8 +64,8 @@ class StatsCollector:
         if numel <= max_samples:
             return flat_tensor.cpu().numpy()
         else:
-            # Random sampling
-            indices = torch.randperm(numel)[:max_samples]
+            # Optimization: Use randint instead of randperm
+            indices = torch.randint(0, numel, (max_samples,), device=flat_tensor.device)
             return flat_tensor[indices].cpu().numpy()
     
     def update_streaming_stats(self, name, tensor):
@@ -65,10 +75,20 @@ class StatsCollector:
             
         with torch.no_grad():
             flat_tensor = tensor.flatten()
-            batch_mean = float(torch.mean(flat_tensor))
-            batch_std = float(torch.std(flat_tensor))
-            batch_min = float(torch.min(flat_tensor))
-            batch_max = float(torch.max(flat_tensor))
+            
+            # Optimization: Compute all stats on GPU first to avoid multiple CPU-GPU syncs
+            t_mean = torch.mean(flat_tensor)
+            t_std = torch.std(flat_tensor)
+            t_min = torch.min(flat_tensor)
+            t_max = torch.max(flat_tensor)
+            
+            # Move to CPU in a single transfer
+            stats_vec = torch.stack([t_mean, t_std, t_min, t_max]).cpu().numpy()
+            
+            batch_mean = float(stats_vec[0])
+            batch_std = float(stats_vec[1])
+            batch_min = float(stats_vec[2])
+            batch_max = float(stats_vec[3])
             batch_size = flat_tensor.numel()
             
             if name not in self.streaming_stats:
@@ -373,6 +393,111 @@ def collect_model_stats(args, net, dataloader, model_type, num_inference_batches
     
     return stats_collector
 
+def collect_gradient_stats(args, net, dataloader, stats_collector):
+    """Collect gradient statistics (parameters only)"""
+    logger.info("Collecting gradient statistics...")
+    
+    # Run one batch with gradients
+    net.train() # Enable gradients
+    net.zero_grad()
+    
+    # Get a batch from train loader, else val loader
+    loader = dataloader.get('train', dataloader.get('val'))
+    batch_data = next(iter(loader))
+
+    # Move to device and forward/backward
+    if args.dataset_name in ['imagenet', 'imagenet-mini']:
+        images, labels = batch_data
+        images = images.to(args.device)
+        labels = labels.to(args.device)
+        output = net(images)
+        criterion = nn.CrossEntropyLoss()
+        loss = criterion(output, labels)
+    elif args.dataset_name == 'co3d':
+        from src.models.depth.vggt.training.train_utils.general import copy_data_to_device
+        batch_data = copy_data_to_device(batch_data, args.device)
+        output = net(images=batch_data["images"])
+        # Proxy loss: mean of output (assuming output is depth or similar)
+        if isinstance(output, dict):
+            loss = output['pred'].mean() if 'pred' in output else sum(v.mean() for v in output.values() if isinstance(v, torch.Tensor))
+        elif isinstance(output, (tuple, list)):
+            loss = output[0].mean()
+        else:
+            loss = output.mean()
+    else:
+            # Fallback
+            if isinstance(batch_data, (tuple, list)):
+                inputs = batch_data[0].to(args.device)
+            else:
+                inputs = batch_data.to(args.device)
+            output = net(inputs)
+            loss = output.mean()
+
+    loss.backward()
+    
+    # Collect parameter gradients (static snapshot)
+    for name, param in net.named_parameters():
+        if param.grad is not None:
+            stats_collector.register_static_tensor(f"{name}.grad", param.grad)
+    
+    net.zero_grad()
+    # Restore eval mode
+    net.eval()
+
+def plot_layer_box_plots(stats_collector, save_dir, prefix=""):
+    """Generate Box and Whisker plots for weights, activations, and gradients"""
+    stats = stats_collector.get_final_stats()
+    
+    # Define categories to plot
+    categories = {
+        'Weights': '.weight',
+        'Activations': '.activation_out',
+        'Gradients': '.grad'
+    }
+    
+    for cat_name, suffix in categories.items():
+        filtered_data = []
+        labels = []
+        
+        # Sort keys for consistent layer order
+        sorted_keys = sorted(stats.keys())
+        
+        for key in sorted_keys:
+            # Check if key matches the category
+            if not key.endswith(suffix):
+                continue
+                
+            s = stats[key]
+            if 'samples' in s and len(s['samples']) > 0:
+                filtered_data.append(s['samples'])
+                # Clean label
+                label = key.replace('.weight', '').replace('.activation_out', '').replace('.grad', '')
+                labels.append(label)
+        
+        if not filtered_data:
+            continue
+
+        # Plot
+        # Dynamic width based on number of layers
+        width = max(12, len(filtered_data) * 0.25)
+        fig, ax = plt.subplots(figsize=(width, 8))
+        
+        # Create boxplot
+        ax.boxplot(filtered_data, labels=labels, showfliers=True, patch_artist=True,
+                  boxprops=dict(facecolor='lightblue', alpha=0.7),
+                  medianprops=dict(color='red'))
+        
+        ax.set_xticklabels(labels, rotation=90, fontsize=8)
+        ax.set_title(f"Distribution of {cat_name} by Layer ({prefix})")
+        ax.set_ylabel('Value')
+        ax.grid(True, axis='y', linestyle='--', alpha=0.6)
+        
+        plt.tight_layout()
+        save_path = os.path.join(save_dir, f"{prefix}_{cat_name.lower()}_boxplot.png")
+        plt.savefig(save_path, dpi=150)
+        plt.close(fig)
+        logger.info(f"Saved {cat_name} boxplot to {save_path}")
+
 def run_stats(args):
     """Main stats collection function"""
     MODULE_TYPES = ['Conv2d', 'Linear', 'QConv2d', 'QLinear', 'LSQ_quantizer', 'ReLU', 'MinMax_quantizer']
@@ -413,12 +538,18 @@ def run_stats(args):
     
     original_stats = collect_model_stats(args, original_net, dataloader, "original", num_inference_batches, MODULE_TYPES, LOG_TENSOR_SUFFIXES)
     
+    # Collect gradients for original model
+    collect_gradient_stats(args, original_net, dataloader, original_stats)
+    
     gc.collect()
     
     histogram_from_stats(original_stats, writer, step=0, model_type="original", 
                         log_tensor_suffixes=LOG_TENSOR_SUFFIXES, 
                         image_suffixes=IMAGE_SUFFIXES, 
                         scalar_suffixes=SCALAR_SUFFIXES)
+    
+    # Plot box plots for original model
+    plot_layer_box_plots(original_stats, save_path, prefix="original")
     
     disk_usage = shutil.disk_usage(args.save_path)
     free_gb = disk_usage.free / (1024**3)
@@ -432,14 +563,30 @@ def run_stats(args):
     logger.info("COLLECTING QUANTIZED MODEL STATISTICS")
     logger.info("=" * 50)
     
-    quantized_net = run_load_model(args)
+    if args.dataset_name == 'co3d':
+        from src.models.depth.qvggt import replace
+        quantized_net = create_model(args)
+        quantized_net = quantized_net.to(args.device)
+        quantized_net = replace(args, quantized_net)
+        stepsize_init(quantized_net, dataloader["train"], args.device, num_batches=args.init_num, dataset_name=args.dataset_name)
+    else:
+        quantized_net = run_load_model(args)
+    
+    torch.set_grad_enabled(True)
     quantized_net.eval()
     
     quantized_stats = collect_model_stats(args, quantized_net, dataloader, "quantized", num_inference_batches, MODULE_TYPES, LOG_TENSOR_SUFFIXES)
+    
+    # Collect gradients for quantized model
+    collect_gradient_stats(args, quantized_net, dataloader, quantized_stats)
+    
     histogram_from_stats(quantized_stats, writer, step=0, model_type="quantized",
                         log_tensor_suffixes=LOG_TENSOR_SUFFIXES, 
                         image_suffixes=IMAGE_SUFFIXES, 
                         scalar_suffixes=SCALAR_SUFFIXES)
+    
+    # Plot box plots for quantized model
+    plot_layer_box_plots(quantized_stats, save_path, prefix="quantized")
     
     logger.info("=" * 50)
     logger.info("CREATING COMPARISON HISTOGRAMS")

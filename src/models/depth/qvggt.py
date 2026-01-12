@@ -37,17 +37,16 @@ def run_evaluation_vggt(model, model_path=None):
     set_random_seeds(args.seed)
 
     # Categories to evaluate
-    # SEEN_CATEGORIES = [
-    #     "apple", "backpack", "banana", "baseballbat", "baseballglove",
-    #     "bench", "bicycle", "bottle", "bowl", "broccoli",
-    #     "cake", "car", "carrot", "cellphone", "chair",
-    #     "cup", "donut", "hairdryer", "handbag", "hydrant",
-    #     "keyboard", "laptop", "microwave", "motorcycle", "mouse",
-    #     "orange", "parkingmeter", "pizza", "plant", "stopsign",
-    #     "teddybear", "toaster", "toilet", "toybus", "toyplane",
-    #     "toytrain", "toytruck", "tv", "umbrella", "vase", "wineglass",
-    # ]
-    SEEN_CATEGORIES = ["apple"]
+    SEEN_CATEGORIES = [
+        "apple", "backpack", "banana", "baseballbat", "baseballglove",
+        "bench", "bicycle", "bottle", "bowl", "broccoli",
+        "cake", "car", "carrot", "cellphone", "chair",
+        "cup", "donut", "hairdryer", "handbag", "hydrant",
+        "keyboard", "laptop", "microwave", "motorcycle", "mouse",
+        "orange", "parkingmeter", "pizza", "plant", "stopsign",
+        "teddybear", "toaster", "toilet", "toybus", "toyplane",
+        "toytrain", "toytruck", "tv", "umbrella", "vase", "wineglass",
+    ]
 
     if args.debug:
         SEEN_CATEGORIES = ["parkingmeter"]
