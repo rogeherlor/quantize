@@ -17,6 +17,7 @@ from src.run_qat import run_qat
 from src.run_stats import run_stats
 from src.run_ptq import run_ptq
 from src.run_distill import run_distill
+from src.run_realquant import run_realquant
 
 if __name__ == '__main__':
     with open('./config/imagenet/LSQ_base.yaml') as file:
@@ -130,8 +131,19 @@ if __name__ == '__main__':
         logger.info("STATS finished")
     elif args.mode == 'DISTILL':
         logger.info("Start DISTILL at the following setting")
+        logger.info(
+            f"lr: {config.lr}, x_step_size_lr: {config.x_step_size_lr}, w_step_size_lr: {config.w_step_size_lr}, "
+            f"weight_decay: {config.weight_decay}, x_step_size_wd: {config.x_step_size_wd}, w_step_size_wd: {config.w_step_size_wd}, "
+            f"x_quantizer: {config.x_quantizer}, w_quantizer: {config.w_quantizer}, "
+            f"x_initializer: {config.x_initializer}, w_initializer: {config.w_initializer}, "
+            f"num_bits: {config.num_bits}, train_id: {config.train_id}"
+        )
         run_distill(config)
         logger.info("DISTILL finished")
+    elif args.mode == 'REALQUANT':
+        logger.info("Start REALQUANT at the following setting")
+        run_realquant(config)
+        logger.info("REALQUANT finished")
 
     torch.cuda.synchronize() if torch.cuda.is_available() else None
     end = time.time()

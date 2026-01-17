@@ -312,7 +312,7 @@ def compute_feature_matching_loss_per_layer(teacher_feats, student_feats):
         layer_losses[name] = layer_loss
         
         # Log per-layer loss for debugging
-        logger.debug(f"Layer {name}: cos_loss={loss_cos.item():.4f}, mse_loss={loss_mse.item():.4f}, total={layer_loss.item():.4f}")
+        ## logger.debug(f"Layer {name}: cos_loss={loss_cos.item():.4f}, mse_loss={loss_mse.item():.4f}, total={layer_loss.item():.4f}")
     
     return layer_losses
 
@@ -383,7 +383,7 @@ def run_distill_vggt(rank, args):
     
     # Distill Single combined loss
     task_loss = student_trainer.loss
-    stages, distill_alpha, distill_beta = get_config()
+    stages = get_config()
     
     for stage_idx, stage in enumerate(stages):
         logger.info("="*50)
@@ -399,6 +399,12 @@ def run_distill_vggt(rank, args):
         # 2. Initialize quantization parameters. Careful, grad is disabled here.
         if args.action == 'load':
             stepsize_init(student_trainer.model.module, student_trainer.train_dataset.get_loader(0), args.device, num_batches=args.init_num, dataset_name=args.dataset_name)
+
+        logger.info(f"==> Validating stage {stage['name']} validation before training")
+        student_trainer.run_val()
+        student_trainer.model.module.eval()
+        run_evaluation_vggt(student_trainer.model.module)
+        student_trainer.model.module.train()
 
         # 3. Expert approach: Enable gradient flow but only update quantized layers
         logger.info(f"==> Setting up gradient flow for stage: {stage['name']}")
@@ -435,10 +441,14 @@ def run_distill_vggt(rank, args):
         logger.info(f"Registered {len(student_extractor.hooks)} student hooks")
 
         # 5. Replace loss function with distillation loss
+        stage_alpha = stage.get('alpha', 0.7)
+        stage_beta = stage.get('beta', 0.3)
+        logger.info(f"Using distillation weights: alpha={stage_alpha}, beta={stage_beta}")
+
         student_trainer.loss = DistillationLossWrapper(
             task_loss, teacher_model,
             teacher_extractor, student_extractor,
-            alpha=distill_alpha, beta=distill_beta
+            alpha=stage_alpha, beta=stage_beta
         )
         
         # 6. Reconstruct optimizers for current stage
@@ -497,6 +507,13 @@ def run_distill_vggt(rank, args):
         
         torch.set_grad_enabled(True)
         student_trainer.run_train()
+
+        # Force validation at the end of the stage because run_train skips the last epoch validation
+        logger.info(f"==> Validating stage {stage['name']} final epoch")
+        student_trainer.run_val()
+        student_trainer.model.module.eval()
+        run_evaluation_vggt(student_trainer.model.module)
+        student_trainer.model.module.train()
         
         # 9. Cleanup and restore
         student_trainer.max_epochs = original_max_epochs
@@ -517,50 +534,52 @@ def get_config():
     # Distillation loss weights (all layers trainable, no freezing)
     # Feature loss: matches intermediate representations from teacher
     # Task loss: ensures final output solves the actual task correctly
-    distill_alpha = 0.7 # feature loss weight
-    distill_beta = 0.3  # task loss weight
     
     stages = [
+        #{
+        #    "name": "patch_embed",
+        #    "layers": ["aggregator.patch_embed"], # all blocks inside patch_embed
+        #    "hook_points": ["aggregator.patch_embed.patch_embed.proj"],
+        #    "epochs": 10,
+        #    "lr": 1e-6
+        #},
+        #{
+        #    "name": "blocks_0_5",
+        #    "layers": [
+        #        "aggregator.frame_blocks.0", "aggregator.frame_blocks.1", 
+        #        "aggregator.frame_blocks.2", "aggregator.frame_blocks.3",
+        #        "aggregator.frame_blocks.4", "aggregator.frame_blocks.5",
+        #        "aggregator.global_blocks.0", "aggregator.global_blocks.1",
+        #        "aggregator.global_blocks.2", "aggregator.global_blocks.3",
+        #        "aggregator.global_blocks.4", "aggregator.global_blocks.5"
+        #    ],
+        #    "hook_points": [
+        #        "aggregator.frame_blocks[5]",
+        #        "aggregator.global_blocks[5]"
+        #    ],
+        #    "epochs": 10,
+        #    "lr": 1e-6,
+        #    "alpha": 0.7,
+        #    "beta": 0.3
+        #},
         {
-            "name": "patch_embed",
-            "layers": ["aggregator.patch_embed"], # all blocks inside patch_embed
-            "hook_points": ["aggregator.patch_embed.patch_embed.proj"],
-            "epochs": 10,
-            "lr": 1e-6
-        },
-        {
-            "name": "blocks_0_5",
+            "name": "blocks_12_17",
             "layers": [
-                "aggregator.frame_blocks.0", "aggregator.frame_blocks.1", 
-                "aggregator.frame_blocks.2", "aggregator.frame_blocks.3",
-                "aggregator.frame_blocks.4", "aggregator.frame_blocks.5",
-                "aggregator.global_blocks.0", "aggregator.global_blocks.1",
-                "aggregator.global_blocks.2", "aggregator.global_blocks.3",
-                "aggregator.global_blocks.4", "aggregator.global_blocks.5"
+                "aggregator.frame_blocks.12", "aggregator.frame_blocks.13", 
+                "aggregator.frame_blocks.14", "aggregator.frame_blocks.15",
+                "aggregator.frame_blocks.16", "aggregator.frame_blocks.17",
+                "aggregator.global_blocks.12", "aggregator.global_blocks.13",
+                "aggregator.global_blocks.14", "aggregator.global_blocks.15",
+                "aggregator.global_blocks.16", "aggregator.global_blocks.17"
             ],
             "hook_points": [
-                "aggregator.frame_blocks[5]",
-                "aggregator.global_blocks[5]"
+                "aggregator.frame_blocks[17]",
+                "aggregator.global_blocks[17]"
             ],
             "epochs": 10,
-            "lr": 1e-6
-        },
-        {
-            "name": "blocks_6_11",
-            "layers": [
-                "aggregator.frame_blocks.6", "aggregator.frame_blocks.7", 
-                "aggregator.frame_blocks.8", "aggregator.frame_blocks.9",
-                "aggregator.frame_blocks.10", "aggregator.frame_blocks.11",
-                "aggregator.global_blocks.6", "aggregator.global_blocks.7",
-                "aggregator.global_blocks.8", "aggregator.global_blocks.9",
-                "aggregator.global_blocks.10", "aggregator.global_blocks.11"
-            ],
-            "hook_points": [
-                "aggregator.frame_blocks[11]",
-                "aggregator.global_blocks[11]"
-            ],
-            "epochs": 10,
-            "lr": 1e-7
+            "lr": 1e-6,
+            "alpha": 1.0,
+            "beta": 0.0
         },
         {
             "name": "blocks_12_17",
@@ -577,7 +596,9 @@ def get_config():
                 "aggregator.global_blocks[17]"
             ],
             "epochs": 10,
-            "lr": 1e-6
+            "lr": 1e-6,
+            "alpha": 0.0,
+            "beta": 1.0
         },
         {
             "name": "blocks_18_23",
@@ -594,35 +615,62 @@ def get_config():
                 "aggregator.global_blocks[23]"
             ],
             "epochs": 10,
-            "lr": 1e-6
+            "lr": 1e-5,
+            "alpha": 1.0,
+            "beta": 0.0
         },
         {
-           "name": "block_all_attn",
-           "layers": [
-               "aggregator.frame_blocks.0.attn",
-           ],
-           "hook_points": [
-               "aggregator.frame_blocks[0].mlp.fc2"
-           ],
-           "epochs": 4,
-           "lr": 1e-6
+            "name": "blocks_18_23",
+            "layers": [
+                "aggregator.frame_blocks.18", "aggregator.frame_blocks.19", 
+                "aggregator.frame_blocks.20", "aggregator.frame_blocks.21",
+                "aggregator.frame_blocks.22", "aggregator.frame_blocks.23",
+                "aggregator.global_blocks.18", "aggregator.global_blocks.19",
+                "aggregator.global_blocks.20", "aggregator.global_blocks.21",
+                "aggregator.global_blocks.22", "aggregator.global_blocks.23"
+            ],
+            "hook_points": [
+                "aggregator.frame_blocks[23]",
+                "aggregator.global_blocks[23]"
+            ],
+            "epochs": 10,
+            "lr": 1e-5,
+            "alpha": 0.0,
+            "beta": 1.0
         },
+        #{
+        #   "name": "block_all_attn",
+        #   "layers": [
+        #       "aggregator.frame_blocks.0.attn",
+        #   ],
+        #   "hook_points": [
+        #       "aggregator.frame_blocks[0].mlp.fc2"
+        #   ],
+        #   "epochs": 4,
+        #   "lr": 1e-6,
+        #    "alpha": 0.7,
+        #    "beta": 0.3
+        #},
         {
             "name": "head2",
             "layers": ["depth_head"],
             "hook_points": ["depth_head"],
             "epochs": 10,
-            "lr": 1e-7
+            "lr": 1e-5,
+            "alpha": 0.7,
+            "beta": 0.3
         },
         {
             "name": "head1",
             "layers": ["camera_head"],
             "hook_points": ["camera_head"],
             "epochs": 10,
-            "lr": 1e-7
+            "lr": 1e-5,
+            "alpha": 0.7,
+            "beta": 0.3
         }
     ]
-    return stages, distill_alpha, distill_beta
+    return stages
 
 def run_distill(args):
     if args.ddp == True:
