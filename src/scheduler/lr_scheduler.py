@@ -36,7 +36,7 @@ class LinearWarmupScheduler(object):
         self._current_epoch = loaded_epoch
         if self._current_epoch  > self.total_epoch:
             for param_group in self.optimizer.param_groups:
-                param_group['lr'] = self.after_lr
+                param_group['lr'] = param_group['after_lr']
             for iepoch in range(self.total_epoch, self._current_epoch):
                 self.after_scheduler.step()
  

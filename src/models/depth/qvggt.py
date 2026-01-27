@@ -208,6 +208,62 @@ def replace(args, net):
     logger.debug(f"Replaced model:\n {net}")
     return net
 
+def load_ckp_vggt(args, trainer, load_scheduler=True):
+    logger.info(f"Loading checkpoint from {args.init_from}")
+    checkpoint = torch.load(args.init_from, map_location="cpu")
+    
+    if "model" in checkpoint:
+        model_state_dict = checkpoint["model"]
+    else:
+        model_state_dict = checkpoint
+        
+    missing, unexpected = trainer.model.module.load_state_dict(
+        model_state_dict, strict=False
+    )
+    logger.info(f"Model loaded. Missing keys: {len(missing) if missing else 0}, Unexpected keys: {len(unexpected) if unexpected else 0}")
+    
+    if "optimizer" in checkpoint and hasattr(trainer, 'optims'):
+        logger.info("Loading optimizer state")
+        if isinstance(trainer.optims, list):
+            if isinstance(checkpoint["optimizer"], list):
+                for i, optim in enumerate(trainer.optims):
+                    optim.optimizer.load_state_dict(checkpoint["optimizer"][i])
+            else:
+                # Single optimizer in checkpoint but list expected
+                trainer.optims[0].optimizer.load_state_dict(checkpoint["optimizer"])
+        else:
+            trainer.optims.optimizer.load_state_dict(checkpoint["optimizer"])
+    
+    # Load scale optimizer if it exists
+    if "s_optimizer" in checkpoint and hasattr(trainer, 's_optimizer') and trainer.s_optimizer is not None:
+        logger.info("Loading scale optimizer state")
+        trainer.s_optimizer.load_state_dict(checkpoint["s_optimizer"])
+    
+    # Get the epoch for scheduler loading
+    loaded_epoch = checkpoint.get("prev_epoch", checkpoint.get("epoch", 0))
+    
+    if load_scheduler and "s_scheduler" in checkpoint and hasattr(trainer, 's_scheduler') and trainer.s_scheduler is not None:
+        logger.info("Loading scale scheduler state")
+        trainer.s_scheduler.load_state_dict(checkpoint["s_scheduler"], loaded_epoch)
+    elif not load_scheduler:
+        logger.info("Skipping scheduler state loading (each stage has its own scheduler)")
+    
+    if "prev_epoch" in checkpoint:
+        trainer.epoch = checkpoint["prev_epoch"] + 1  # Resume from next epoch
+        logger.info(f"Resuming from epoch {trainer.epoch}")
+    elif "epoch" in checkpoint:
+        # Fallback for older checkpoints
+        trainer.epoch = checkpoint["epoch"]
+        logger.info(f"Resuming from epoch {trainer.epoch}")
+    
+    if "steps" in checkpoint:
+        trainer.steps = checkpoint["steps"]
+        logger.info(f"Loaded steps: {trainer.steps}")
+    
+    if "time_elapsed" in checkpoint:
+        trainer.ckpt_time_elapsed = checkpoint["time_elapsed"]
+        logger.info(f"Loaded time elapsed: {trainer.ckpt_time_elapsed:.2f}s")
+
 def run_train_vggt(rank, args):
     logger.info(f"==> Preparing training for {args.dataset_name}..")
 
@@ -235,55 +291,7 @@ def run_train_vggt(rank, args):
         stepsize_init(trainer.model.module, trainer.train_dataset.get_loader(0), args.device, num_batches=args.init_num, dataset_name=args.dataset_name)
 
     if args.init_from and args.action == 'resume':
-        logger.info(f"Loading checkpoint from {args.init_from}")
-        checkpoint = torch.load(args.init_from, map_location="cpu")
-        
-        if "model" in checkpoint:
-            model_state_dict = checkpoint["model"]
-        else:
-            model_state_dict = checkpoint
-            
-        missing, unexpected = trainer.model.module.load_state_dict(
-            model_state_dict, strict=False
-        )
-        logger.info(f"Model loaded. Missing keys: {len(missing) if missing else 0}, Unexpected keys: {len(unexpected) if unexpected else 0}")
-        
-        if "optimizer" in checkpoint and hasattr(trainer, 'optims'):
-            logger.info("Loading optimizer state")
-            if isinstance(trainer.optims, list):
-                if isinstance(checkpoint["optimizer"], list):
-                    for i, optim in enumerate(trainer.optims):
-                        optim.optimizer.load_state_dict(checkpoint["optimizer"][i])
-                else:
-                    # Single optimizer in checkpoint but list expected
-                    trainer.optims[0].optimizer.load_state_dict(checkpoint["optimizer"])
-            else:
-                trainer.optims.optimizer.load_state_dict(checkpoint["optimizer"])
-        
-        # Load scale optimizer if it exists
-        if "s_optimizer" in checkpoint and hasattr(trainer, 's_optimizer') and trainer.s_optimizer is not None:
-            logger.info("Loading scale optimizer state")
-            trainer.s_optimizer.load_state_dict(checkpoint["s_optimizer"])
-        
-        if "s_scheduler" in checkpoint and hasattr(trainer, 's_scheduler') and trainer.s_scheduler is not None:
-            logger.info("Loading scale scheduler state")
-            trainer.s_scheduler.load_state_dict(checkpoint["s_scheduler"])
-        
-        if "prev_epoch" in checkpoint:
-            trainer.epoch = checkpoint["prev_epoch"] + 1  # Resume from next epoch
-            logger.info(f"Resuming from epoch {trainer.epoch}")
-        elif "epoch" in checkpoint:
-            # Fallback for older checkpoints
-            trainer.epoch = checkpoint["epoch"]
-            logger.info(f"Resuming from epoch {trainer.epoch}")
-        
-        if "steps" in checkpoint:
-            trainer.steps = checkpoint["steps"]
-            logger.info(f"Loaded steps: {trainer.steps}")
-        
-        if "time_elapsed" in checkpoint:
-            trainer.ckpt_time_elapsed = checkpoint["time_elapsed"]
-            logger.info(f"Loaded time elapsed: {trainer.ckpt_time_elapsed:.2f}s")
+        load_ckp_vggt(args, trainer)
 
     if args.different_optimizer_mode:
         sparams, params = split_params(\

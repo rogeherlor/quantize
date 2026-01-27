@@ -19,6 +19,7 @@ from src.quantizer.uniform.lsq import LSQ_quantizer
 from torch.utils.tensorboard import SummaryWriter
 
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 class StatsCollector:
     """Stats collector that uses streaming statistics and sampling for memory efficiency"""
@@ -28,16 +29,22 @@ class StatsCollector:
         self.max_samples_per_tensor = max_samples_per_tensor
         self.sample_ratio = sample_ratio  # Ratio of values to sample from each tensor
         self.sample_buffers = defaultdict(list)  # Temporary buffers for sampled values
+        self.snapshots = {}  # Snapshots for structure visualization
         
     def reset(self):
         self.static_stats = {}
         self.streaming_stats = {}
         self.sample_buffers.clear()
+        self.snapshots.clear()
     
     def register_static_tensor(self, name, tensor):
         """Register static tensors (weights, biases) - computed once"""
         if name not in self.static_stats and tensor is not None and tensor.numel() > 0:
             with torch.no_grad():
+                # Capture snapshot for visualization (if not too large)
+                if name not in self.snapshots and tensor.numel() < 10_000_000:
+                    self.snapshots[name] = tensor.detach().cpu().numpy()
+                
                 flat_tensor = tensor.flatten()
                 
                 # Optimization: Compute all stats on GPU and transfer once
@@ -74,6 +81,16 @@ class StatsCollector:
             return
             
         with torch.no_grad():
+            # Capture snapshot for visualization (first valid tensor encountered)
+            if name not in self.snapshots:
+                # If batched, take first element
+                snapshot = tensor
+                if tensor.dim() > 0 and tensor.shape[0] > 0:
+                    snapshot = tensor[0] # Take first sample in batch
+                
+                if snapshot.numel() < 10_000_000:
+                    self.snapshots[name] = snapshot.detach().cpu().numpy()
+
             flat_tensor = tensor.flatten()
             
             # Optimization: Compute all stats on GPU first to avoid multiple CPU-GPU syncs
@@ -224,8 +241,16 @@ def inference(args, net, dataloader, num_batches=1, stats_collector=None):
     
     return batch_count
 
-def plot_histogram(data, title, bins=256):
-    """Single histogram plot"""
+def plot_histogram(data, title, bins=256, clip_value=None):
+    """Single histogram plot with optional gradient clipping"""
+    original_data = data
+    n_clipped = 0
+    
+    # Apply clipping if specified (for gradients)
+    if clip_value is not None and '.grad' in title:
+        n_clipped = np.sum((np.abs(data) > clip_value))
+        data = np.clip(data, -clip_value, clip_value)
+    
     mean_val = np.mean(data)
     std_val = np.std(data)
     min_val = np.min(data)
@@ -239,6 +264,11 @@ def plot_histogram(data, title, bins=256):
     
     # Add std to legend without a line - create invisible line for legend entry
     ax.plot([], [], ' ', label=f'Std: {std_val:.4e}')
+    
+    # Add clipping info if applicable
+    if n_clipped > 0:
+        clip_pct = (n_clipped / len(original_data)) * 100
+        ax.plot([], [], ' ', label=f'Clipped: {n_clipped} ({clip_pct:.2f}%)')
     
     ax.set_title(title)
     ax.set_xlabel('Value')
@@ -286,11 +316,11 @@ def get_layer_and_suffix(name):
     return '.'.join(parts[:-1]), parts[-1]
 
 def histogram_from_stats(stats_collector, writer, step=0, model_type="", 
-                        log_tensor_suffixes=None, image_suffixes=None, scalar_suffixes=None):
+                        log_tensor_suffixes=None, image_suffixes=None, scalar_suffixes=None, gradient_clip_value=None):
     """Generate histograms from collected statistics"""
     logger.debug(f"Logging {model_type} histograms to TensorBoard...")
     
-    def log_tensor_stats(writer, tag_prefix, suffix, stats, step, model_type):
+    def log_tensor_stats(writer, tag_prefix, suffix, stats, step, model_type, gradient_clip_value):
         if not stats or ('samples' not in stats and 'mean' not in stats):
             return
 
@@ -303,11 +333,15 @@ def histogram_from_stats(stats_collector, writer, step=0, model_type="",
         else:
             # Log histogram data to TensorBoard
             if 'samples' in stats and len(stats['samples']) > 0:
-                writer.add_histogram(tag_name, stats['samples'], step)
+                # Apply gradient clipping for histogram visualization
+                samples = stats['samples']
+                if gradient_clip_value is not None and suffix == 'grad':
+                    samples = np.clip(samples, -gradient_clip_value, gradient_clip_value)
+                writer.add_histogram(tag_name, samples, step)
                 
-                # Create histogram images for selected tensors
-                if suffix in image_suffixes and len(stats['samples']) > 10:
-                    fig = plot_histogram(stats['samples'], f"{tag_prefix}/{suffix}_{model_type}")
+                # Create histogram images for selected tensors (including gradients)
+                if (suffix in image_suffixes or suffix == 'grad') and len(stats['samples']) > 10:
+                    fig = plot_histogram(stats['samples'], f"{tag_prefix}/{suffix}_{model_type}", clip_value=gradient_clip_value)
                     writer.add_figure(f"{tag_name}_image", fig, step)
                     plt.close(fig)
     
@@ -317,9 +351,9 @@ def histogram_from_stats(stats_collector, writer, step=0, model_type="",
     for tensor_name, stats in all_stats.items():
         layer, suffix = get_layer_and_suffix(tensor_name)
         
-        if suffix in log_tensor_suffixes:
+        if suffix in log_tensor_suffixes or suffix == 'grad':
             tag_prefix = f"{layer}"
-            log_tensor_stats(writer, tag_prefix, suffix, stats, step, model_type)
+            log_tensor_stats(writer, tag_prefix, suffix, stats, step, model_type, gradient_clip_value)
             logger.debug(f"Logged stats for {tensor_name} under {tag_prefix}/{suffix}")
     
     # Force write to disk to prevent data loss
@@ -393,58 +427,89 @@ def collect_model_stats(args, net, dataloader, model_type, num_inference_batches
     
     return stats_collector
 
-def collect_gradient_stats(args, net, dataloader, stats_collector):
-    """Collect gradient statistics (parameters only)"""
-    logger.info("Collecting gradient statistics...")
+def collect_gradient_stats(args, net, dataloader, stats_collector, num_inference_batches=10):
+    """Collect gradient statistics across multiple batches using streaming statistics (same as activations)"""
+    logger.info(f"Collecting gradient statistics across {num_inference_batches} batches...")
     
-    # Run one batch with gradients
     net.train() # Enable gradients
-    net.zero_grad()
     
-    # Get a batch from train loader, else val loader
+    # Get iterator from train loader, else val loader
     loader = dataloader.get('train', dataloader.get('val'))
-    batch_data = next(iter(loader))
-
-    # Move to device and forward/backward
-    if args.dataset_name in ['imagenet', 'imagenet-mini']:
-        images, labels = batch_data
-        images = images.to(args.device)
-        labels = labels.to(args.device)
-        output = net(images)
-        criterion = nn.CrossEntropyLoss()
-        loss = criterion(output, labels)
-    elif args.dataset_name == 'co3d':
-        from src.models.depth.vggt.training.train_utils.general import copy_data_to_device
-        batch_data = copy_data_to_device(batch_data, args.device)
-        output = net(images=batch_data["images"])
-        # Proxy loss: mean of output (assuming output is depth or similar)
-        if isinstance(output, dict):
-            loss = output['pred'].mean() if 'pred' in output else sum(v.mean() for v in output.values() if isinstance(v, torch.Tensor))
-        elif isinstance(output, (tuple, list)):
-            loss = output[0].mean()
-        else:
-            loss = output.mean()
-    else:
-            # Fallback
-            if isinstance(batch_data, (tuple, list)):
-                inputs = batch_data[0].to(args.device)
-            else:
-                inputs = batch_data.to(args.device)
-            output = net(inputs)
-            loss = output.mean()
-
-    loss.backward()
     
-    # Collect parameter gradients (static snapshot)
-    for name, param in net.named_parameters():
-        if param.grad is not None:
-            stats_collector.register_static_tensor(f"{name}.grad", param.grad)
+    # Load loss configuration once for CO3D
+    if args.dataset_name == 'co3d':
+        from hydra import compose, initialize_config_dir
+        config_dir = os.path.join(os.path.dirname(__file__), 'models/depth/vggt/training/config')
+        config_dir = os.path.abspath(config_dir)
+        with initialize_config_dir(config_dir=config_dir, version_base=None):
+            cfg = compose(config_name="default")
+            loss_conf = cfg.loss
+        from hydra.utils import instantiate
+        from src.models.depth.vggt.training.train_utils.general import copy_data_to_device
+        from src.models.depth.vggt.training.train_utils.normalization import normalize_camera_extrinsics_and_points_batch
+    
+    # Collect gradients across multiple batches (same as activations)
+    for batch_idx, batch_data in enumerate(loader):
+        if batch_idx >= num_inference_batches:
+            break
+            
+        net.zero_grad()
+        
+        # Move to device and forward/backward with actual loss
+        if args.dataset_name in ['imagenet', 'imagenet-mini']:
+            images, labels = batch_data
+            images = images.to(args.device)
+            labels = labels.to(args.device)
+            output = net(images)
+            criterion = nn.CrossEntropyLoss()
+            loss = criterion(output, labels)
+        elif args.dataset_name == 'co3d':
+            # Normalize batch data (same as in training)
+            with torch.cuda.amp.autocast(enabled=False):
+                normalized_extrinsics, normalized_cam_points, normalized_world_points, normalized_depths = \
+                    normalize_camera_extrinsics_and_points_batch(
+                        extrinsics=batch_data["extrinsics"],
+                        cam_points=batch_data["cam_points"],
+                        world_points=batch_data["world_points"],
+                        depths=batch_data["depths"],
+                        point_masks=batch_data["point_masks"],
+                    )
+                batch_data["extrinsics"] = normalized_extrinsics
+                batch_data["cam_points"] = normalized_cam_points
+                batch_data["world_points"] = normalized_world_points
+                batch_data["depths"] = normalized_depths
+            
+            batch_data = copy_data_to_device(batch_data, args.device, non_blocking=True)
+            
+            # Forward pass
+            output = net(images=batch_data["images"])
+            
+            # Filter out outputs for heads that are disabled in loss config
+            if loss_conf.point is None and "world_points" in output:
+                del output["world_points"]
+            if loss_conf.track is None and "track" in output:
+                del output["track"]
+            
+            # Use the actual training loss function
+            loss_fn = instantiate(loss_conf, _recursive_=False)
+            loss_dict = loss_fn(output, batch_data)
+            loss = loss_dict["objective"]
+        
+        loss.backward()
+        
+        logger.info(f"Batch {batch_idx + 1}/{num_inference_batches}: loss = {loss.item():.4f}")
+        
+        # Collect parameter gradients using streaming statistics (same approach as activations)
+        for name, param in net.named_parameters():
+            if param.grad is not None:
+                stats_collector.update_streaming_stats(f"{name}.grad", param.grad)
     
     net.zero_grad()
     # Restore eval mode
     net.eval()
+    logger.info(f"Completed gradient collection across {num_inference_batches} batches")
 
-def plot_layer_box_plots(stats_collector, save_dir, prefix=""):
+def plot_layer_box_plots(stats_collector, save_dir, prefix="", gradient_clip_value=None):
     """Generate Box and Whisker plots for weights, activations, and gradients"""
     stats = stats_collector.get_final_stats()
     
@@ -459,8 +524,9 @@ def plot_layer_box_plots(stats_collector, save_dir, prefix=""):
         filtered_data = []
         labels = []
         
-        # Sort keys for consistent layer order
-        sorted_keys = sorted(stats.keys())
+        # Keep keys in the order they appear (insertion order in dict = execution order)
+        # This preserves the forward pass order from input to output
+        sorted_keys = list(stats.keys())
         
         for key in sorted_keys:
             # Check if key matches the category
@@ -469,7 +535,11 @@ def plot_layer_box_plots(stats_collector, save_dir, prefix=""):
                 
             s = stats[key]
             if 'samples' in s and len(s['samples']) > 0:
-                filtered_data.append(s['samples'])
+                samples = s['samples']
+                # Apply gradient clipping for gradients
+                if cat_name == 'Gradients' and gradient_clip_value is not None:
+                    samples = np.clip(samples, -gradient_clip_value, gradient_clip_value)
+                filtered_data.append(samples)
                 # Clean label
                 label = key.replace('.weight', '').replace('.activation_out', '').replace('.grad', '')
                 labels.append(label)
@@ -488,7 +558,10 @@ def plot_layer_box_plots(stats_collector, save_dir, prefix=""):
                   medianprops=dict(color='red'))
         
         ax.set_xticklabels(labels, rotation=90, fontsize=8)
-        ax.set_title(f"Distribution of {cat_name} by Layer ({prefix})")
+        title = f"Distribution of {cat_name} by Layer ({prefix})"
+        if cat_name == 'Gradients' and gradient_clip_value is not None:
+            title += f" [Clipped at ±{gradient_clip_value}]"
+        ax.set_title(title)
         ax.set_ylabel('Value')
         ax.grid(True, axis='y', linestyle='--', alpha=0.6)
         
@@ -498,6 +571,120 @@ def plot_layer_box_plots(stats_collector, save_dir, prefix=""):
         plt.close(fig)
         logger.info(f"Saved {cat_name} boxplot to {save_path}")
 
+def plot_3d_surface(stats_collector, save_dir, prefix="", gradient_clip_value=None):
+    """Generate 3D surface plots showing tensor values across dimension and token indices"""
+    # Use snapshots if available, otherwise fallback to stats
+    snapshots = getattr(stats_collector, 'snapshots', {})
+    
+    # Define categories to plot
+    categories = {
+        'Weights': '.weight',
+        'Activations': '.activation_out',
+        'Gradients': '.grad'
+    }
+    
+    for cat_name, suffix in categories.items():
+        logger.info(f"Generating 3D surface plots for {cat_name}...")
+        
+        plot_count = 0
+        sorted_keys = sorted(list(snapshots.keys()))
+        
+        for key in sorted_keys:
+            if not key.endswith(suffix):
+                continue
+                
+            data = snapshots[key]
+            layer_name = key.replace(suffix, '')
+            
+            # We want to plot [Tokens, Dimensions] or similar 2D structures
+            # If 1D (Bias), skip
+            # If 3D?
+            
+            plot_data = None
+            x_label = 'Dimension 1'
+            y_label = 'Dimension 0'
+            
+            if data.ndim == 2:
+                # [Tokens, Dim] or [Out, In]
+                plot_data = data
+                y_label = 'Dimension 0 (e.g. Tokens/OutCh)'
+                x_label = 'Dimension 1 (e.g. EmbedDim/InCh)'
+            elif data.ndim == 3:
+                # 3D Tensor - maybe [Heads, Tokens, Dim]? Take average over First dim?
+                # Or just take first slice
+                plot_data = data[0]
+                y_label = 'Dimension 1'
+                x_label = 'Dimension 2'
+            elif data.ndim == 4:
+                # Conv Weights [Out, In, H, W]
+                # Can't easily plot 3D surface of 4D. 
+                # Maybe reshape to 2D? [Out, In*H*W]?
+                # Or just skip 4D for "Tokens/Dimensions" visualization
+                continue
+            
+            if plot_data is None:
+                continue
+
+            # Apply gradient clipping
+            if cat_name == 'Gradients' and gradient_clip_value is not None:
+                plot_data = np.clip(plot_data, -gradient_clip_value, gradient_clip_value)
+
+            # Downsample if too large for matplotlib 3D
+            # Matplotlib struggles with > 50x50 or 100x100
+            MAX_GRID = 80
+            h, w = plot_data.shape
+            
+            # Simple strided downsampling
+            stride_h = max(1, h // MAX_GRID)
+            stride_w = max(1, w // MAX_GRID)
+            
+            plot_data_sub = plot_data[::stride_h, ::stride_w]
+            
+            # Coordinates
+            x = np.arange(0, w, stride_w)
+            y = np.arange(0, h, stride_h)
+            
+            # Ensure dimensions match (sometimes slice can be off by 1)
+            x = x[:plot_data_sub.shape[1]]
+            y = y[:plot_data_sub.shape[0]]
+            
+            X, Y = np.meshgrid(x, y)
+            Z = plot_data_sub
+            
+            fig = plt.figure(figsize=(12, 8))
+            ax = fig.add_subplot(111, projection='3d')
+            
+            # Plot surface
+            surf = ax.plot_surface(X, Y, Z, cmap='viridis', linewidth=0.5, edgecolor='none', alpha=0.9)
+            
+            ax.set_xlabel(x_label, fontsize=10)
+            ax.set_ylabel(y_label, fontsize=10)
+            ax.set_zlabel('Value', fontsize=10)
+            
+            title = f"{layer_name} - {cat_name} Structures ({prefix})"
+            if cat_name == 'Gradients' and gradient_clip_value is not None:
+                title += f"\n(clipped to ±{gradient_clip_value})"
+            ax.set_title(title, fontsize=11)
+            
+            # Add colorbar
+            fig.colorbar(surf, ax=ax, shrink=0.5, aspect=10)
+            
+            # Adjust view
+            ax.view_init(elev=30, azim=-60)
+            
+            plt.tight_layout()
+            
+            safe_layer_name = layer_name.replace('/', '_').replace('.', '_')
+            save_path = os.path.join(save_dir, f"{prefix}_{safe_layer_name}_{cat_name.lower()}_structure_3d.png")
+            plt.savefig(save_path, dpi=100)
+            plt.close(fig)
+            
+            plot_count += 1
+            if plot_count >= 20: 
+                break
+        
+        logger.info(f"Generated {plot_count} 3D structure plots for {cat_name}")
+
 def run_stats(args):
     """Main stats collection function"""
     MODULE_TYPES = ['Conv2d', 'Linear', 'QConv2d', 'QLinear', 'LSQ_quantizer', 'ReLU', 'MinMax_quantizer']
@@ -506,6 +693,10 @@ def run_stats(args):
     IMAGE_SUFFIXES = ['weight', 'activation_in', 'activation_out']
     SCALAR_SUFFIXES = ['scale', 'w_scale', 'x_scale']
     COMPARISON_SUFFIXES = ['weight', 'activation_in', 'activation_out']
+    
+    # Gradient clipping value for visualization (to handle outliers)
+    GRADIENT_CLIP_VALUE = getattr(args, 'gradient_clip_value', 100)  # Default to 100
+    logger.info(f"Using gradient clipping value: ±{GRADIENT_CLIP_VALUE} for visualization")
     
     num_inference_batches = max(1, int(1 / args.batch_size))
 
@@ -538,18 +729,22 @@ def run_stats(args):
     
     original_stats = collect_model_stats(args, original_net, dataloader, "original", num_inference_batches, MODULE_TYPES, LOG_TENSOR_SUFFIXES)
     
-    # Collect gradients for original model
-    collect_gradient_stats(args, original_net, dataloader, original_stats)
+    # Collect gradients for original model (same number of batches as activations)
+    collect_gradient_stats(args, original_net, dataloader, original_stats, num_inference_batches)
     
     gc.collect()
     
     histogram_from_stats(original_stats, writer, step=0, model_type="original", 
                         log_tensor_suffixes=LOG_TENSOR_SUFFIXES, 
                         image_suffixes=IMAGE_SUFFIXES, 
-                        scalar_suffixes=SCALAR_SUFFIXES)
+                        scalar_suffixes=SCALAR_SUFFIXES,
+                        gradient_clip_value=GRADIENT_CLIP_VALUE)
     
     # Plot box plots for original model
-    plot_layer_box_plots(original_stats, save_path, prefix="original")
+    plot_layer_box_plots(original_stats, save_path, prefix="original", gradient_clip_value=GRADIENT_CLIP_VALUE)
+    
+    # Plot 3D surface plots for original model
+    plot_3d_surface(original_stats, save_path, prefix="original", gradient_clip_value=GRADIENT_CLIP_VALUE)
     
     disk_usage = shutil.disk_usage(args.save_path)
     free_gb = disk_usage.free / (1024**3)
@@ -577,16 +772,20 @@ def run_stats(args):
     
     quantized_stats = collect_model_stats(args, quantized_net, dataloader, "quantized", num_inference_batches, MODULE_TYPES, LOG_TENSOR_SUFFIXES)
     
-    # Collect gradients for quantized model
-    collect_gradient_stats(args, quantized_net, dataloader, quantized_stats)
+    # Collect gradients for quantized model (same number of batches as activations)
+    collect_gradient_stats(args, quantized_net, dataloader, quantized_stats, num_inference_batches)
     
     histogram_from_stats(quantized_stats, writer, step=0, model_type="quantized",
                         log_tensor_suffixes=LOG_TENSOR_SUFFIXES, 
                         image_suffixes=IMAGE_SUFFIXES, 
-                        scalar_suffixes=SCALAR_SUFFIXES)
+                        scalar_suffixes=SCALAR_SUFFIXES,
+                        gradient_clip_value=GRADIENT_CLIP_VALUE)
     
     # Plot box plots for quantized model
-    plot_layer_box_plots(quantized_stats, save_path, prefix="quantized")
+    plot_layer_box_plots(quantized_stats, save_path, prefix="quantized", gradient_clip_value=GRADIENT_CLIP_VALUE)
+    
+    # Plot 3D surface plots for quantized model
+    plot_3d_surface(quantized_stats, save_path, prefix="quantized", gradient_clip_value=GRADIENT_CLIP_VALUE)
     
     logger.info("=" * 50)
     logger.info("CREATING COMPARISON HISTOGRAMS")

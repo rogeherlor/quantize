@@ -22,7 +22,7 @@ from src.make_ex_name import *
 
 from src.models.depth.vggt.evaluation.test_co3d import *
 
-from src.models.depth.qvggt import run_evaluation_vggt
+from src.models.depth.qvggt import run_evaluation_vggt, load_ckp_vggt
 
 class DistillationLossWrapper(nn.Module):
     """
@@ -308,7 +308,7 @@ def compute_feature_matching_loss_per_layer(teacher_feats, student_feats):
         loss_mse = F.mse_loss(s_feat, t_feat)
         
         # Combined loss for this layer
-        layer_loss = loss_cos + 0.1 * loss_mse
+        layer_loss = loss_cos ## loss_cos + 0.1 * loss_mse
         layer_losses[name] = layer_loss
         
         # Log per-layer loss for debugging
@@ -322,7 +322,7 @@ def run_distill_vggt(rank, args):
     os.environ["RANK"] = str(rank)
     os.environ["WORLD_SIZE"] = str(args.world_size)
     os.environ["MASTER_ADDR"] = "localhost"
-    os.environ["MASTER_PORT"] = "12398"
+    os.environ["MASTER_PORT"] = "12399"
     os.environ["NCCL_P2P_DISABLE"] = "1"
 
     os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
@@ -397,15 +397,9 @@ def run_distill_vggt(rank, args):
         student_trainer.gradient_clipper.setup_clipping(student_trainer.model)
         
         # 2. Initialize quantization parameters. Careful, grad is disabled here.
-        if args.action == 'load':
-            stepsize_init(student_trainer.model.module, student_trainer.train_dataset.get_loader(0), args.device, num_batches=args.init_num, dataset_name=args.dataset_name)
-
-        logger.info(f"==> Validating stage {stage['name']} validation before training")
-        student_trainer.run_val()
-        student_trainer.model.module.eval()
-        run_evaluation_vggt(student_trainer.model.module)
-        student_trainer.model.module.train()
-
+        # if args.action == 'load':
+        stepsize_init(student_trainer.model.module, student_trainer.train_dataset.get_loader(0), args.device, num_batches=args.init_num, dataset_name=args.dataset_name)
+        
         # 3. Expert approach: Enable gradient flow but only update quantized layers
         logger.info(f"==> Setting up gradient flow for stage: {stage['name']}")
         # Clear any existing gradients
@@ -497,6 +491,17 @@ def run_distill_vggt(rank, args):
             )
         ]
         
+        # 7. Load checkpoint for 'resume' action AFTER optimizer is reconstructed (so param groups match)
+        # Skip scheduler loading since each stage creates its own fresh scheduler
+        if args.init_from and args.action == 'resume':
+            load_ckp_vggt(args, student_trainer, load_scheduler=False)
+            
+        logger.info(f"==> Validating stage {stage['name']} validation before training")
+        student_trainer.run_val()
+        student_trainer.model.module.eval()
+        run_evaluation_vggt(student_trainer.model.module)
+        student_trainer.model.module.train()
+        
         # 8. Train for this stage's epochs using Trainer.run_train()
         stage_max_epochs = student_trainer.epoch + stage['epochs']
         original_max_epochs = student_trainer.max_epochs
@@ -576,8 +581,8 @@ def get_config():
                 "aggregator.frame_blocks[17]",
                 "aggregator.global_blocks[17]"
             ],
-            "epochs": 10,
-            "lr": 1e-6,
+            "epochs": 0,
+            "lr": 1e-3,
             "alpha": 1.0,
             "beta": 0.0
         },
@@ -592,11 +597,21 @@ def get_config():
                 "aggregator.global_blocks.16", "aggregator.global_blocks.17"
             ],
             "hook_points": [
+                "aggregator.frame_blocks[12]",
+                "aggregator.global_blocks[12]",
+                "aggregator.frame_blocks[13]",
+                "aggregator.global_blocks[13]",
+                "aggregator.frame_blocks[14]",
+                "aggregator.global_blocks[14]",
+                "aggregator.frame_blocks[15]",
+                "aggregator.global_blocks[15]",
+                "aggregator.frame_blocks[16]",
+                "aggregator.global_blocks[16]",
                 "aggregator.frame_blocks[17]",
                 "aggregator.global_blocks[17]"
             ],
-            "epochs": 10,
-            "lr": 1e-6,
+            "epochs": 30,
+            "lr": 1e-3,
             "alpha": 0.0,
             "beta": 1.0
         },
