@@ -15,6 +15,7 @@ from src.utils import setup_dataloader, stepsize_init
 from src.make_ex_name import *
 from src.models.model import create_model
 from src.quantizer.uniform.lsq import LSQ_quantizer
+from src.utils_layer_selection import expand_layer_names, filter_stats_by_layers, filter_snapshots_by_layers
 
 from torch.utils.tensorboard import SummaryWriter
 
@@ -417,6 +418,7 @@ def collect_model_stats(args, net, dataloader, model_type, num_inference_batches
     # Attach hooks for activation statistics (dynamic - streaming)
     logger.debug("Attaching hooks for streaming activation statistics...")
     hooks = attach_stats_hooks(net, stats_collector, module_types)
+    logger.info(f"Attached {len(hooks)} hooks for activation collection")
     
     logger.debug(f"Model inference started for {num_inference_batches} batches...")
     batches_processed = inference(args, net, dataloader, num_batches=num_inference_batches, stats_collector=stats_collector)
@@ -509,9 +511,12 @@ def collect_gradient_stats(args, net, dataloader, stats_collector, num_inference
     net.eval()
     logger.info(f"Completed gradient collection across {num_inference_batches} batches")
 
-def plot_layer_box_plots(stats_collector, save_dir, prefix="", gradient_clip_value=None):
+def plot_layer_box_plots(stats_collector, save_dir, prefix="", gradient_clip_value=None, layer_filter=None):
     """Generate Box and Whisker plots for weights, activations, and gradients"""
     stats = stats_collector.get_final_stats()
+    
+    # Filter stats if layer_filter is provided
+    stats = filter_stats_by_layers(stats, layer_filter)
     
     # Define categories to plot
     categories = {
@@ -571,10 +576,13 @@ def plot_layer_box_plots(stats_collector, save_dir, prefix="", gradient_clip_val
         plt.close(fig)
         logger.info(f"Saved {cat_name} boxplot to {save_path}")
 
-def plot_3d_surface(stats_collector, save_dir, prefix="", gradient_clip_value=None):
-    """Generate 3D surface plots showing tensor values across dimension and token indices"""
+def plot_3d_surface(stats_collector, save_dir, prefix="", gradient_clip_value=None, layer_filter=None):
+    """Generate combined 3D surface plots with unified scale for comparison"""
     # Use snapshots if available, otherwise fallback to stats
     snapshots = getattr(stats_collector, 'snapshots', {})
+    
+    # Filter snapshots by layer specification
+    snapshots = filter_snapshots_by_layers(snapshots, layer_filter)
     
     # Define categories to plot
     categories = {
@@ -584,10 +592,13 @@ def plot_3d_surface(stats_collector, save_dir, prefix="", gradient_clip_value=No
     }
     
     for cat_name, suffix in categories.items():
-        logger.info(f"Generating 3D surface plots for {cat_name}...")
+        logger.info(f"Generating combined 3D surface plot for {cat_name}...")
         
-        plot_count = 0
+        # First pass: collect all valid layers and compute global z-range
+        layer_data_list = []
         sorted_keys = sorted(list(snapshots.keys()))
+        global_min = float('inf')
+        global_max = float('-inf')
         
         for key in sorted_keys:
             if not key.endswith(suffix):
@@ -596,94 +607,226 @@ def plot_3d_surface(stats_collector, save_dir, prefix="", gradient_clip_value=No
             data = snapshots[key]
             layer_name = key.replace(suffix, '')
             
-            # We want to plot [Tokens, Dimensions] or similar 2D structures
-            # If 1D (Bias), skip
-            # If 3D?
-            
+            # Extract 2D data for plotting
             plot_data = None
             x_label = 'Dimension 1'
             y_label = 'Dimension 0'
             
             if data.ndim == 2:
-                # [Tokens, Dim] or [Out, In]
                 plot_data = data
-                y_label = 'Dimension 0 (e.g. Tokens/OutCh)'
-                x_label = 'Dimension 1 (e.g. EmbedDim/InCh)'
+                y_label = 'Dim 0 (Tokens/OutCh)'
+                x_label = 'Dim 1 (EmbedDim/InCh)'
             elif data.ndim == 3:
-                # 3D Tensor - maybe [Heads, Tokens, Dim]? Take average over First dim?
-                # Or just take first slice
                 plot_data = data[0]
-                y_label = 'Dimension 1'
-                x_label = 'Dimension 2'
+                y_label = 'Dim 1'
+                x_label = 'Dim 2'
             elif data.ndim == 4:
-                # Conv Weights [Out, In, H, W]
-                # Can't easily plot 3D surface of 4D. 
-                # Maybe reshape to 2D? [Out, In*H*W]?
-                # Or just skip 4D for "Tokens/Dimensions" visualization
-                continue
+                # For Conv: reshape [Out, In, H, W] -> [Out, In*H*W]
+                out_ch, in_ch, h, w = data.shape
+                plot_data = data.reshape(out_ch, in_ch * h * w)
+                y_label = 'Out Channels'
+                x_label = 'In*H*W'
             
-            if plot_data is None:
+            if plot_data is None or plot_data.size == 0:
                 continue
 
             # Apply gradient clipping
             if cat_name == 'Gradients' and gradient_clip_value is not None:
                 plot_data = np.clip(plot_data, -gradient_clip_value, gradient_clip_value)
 
-            # Downsample if too large for matplotlib 3D
-            # Matplotlib struggles with > 50x50 or 100x100
-            MAX_GRID = 80
-            h, w = plot_data.shape
+            # Update global min/max for unified scale
+            global_min = min(global_min, np.min(plot_data))
+            global_max = max(global_max, np.max(plot_data))
             
-            # Simple strided downsampling
+            layer_data_list.append({
+                'name': layer_name,
+                'data': plot_data,
+                'x_label': x_label,
+                'y_label': y_label
+            })
+            
+            # Limit to reasonable number of subplots
+            if len(layer_data_list) >= 20:
+                break
+        
+        if not layer_data_list:
+            logger.info(f"No valid layers found for {cat_name}")
+            continue
+        
+        # Create combined figure with subplots
+        n_layers = len(layer_data_list)
+        n_cols = min(4, n_layers)  # Max 4 columns
+        n_rows = (n_layers + n_cols - 1) // n_cols
+        
+        fig = plt.figure(figsize=(5 * n_cols, 4 * n_rows))
+        
+        for idx, layer_info in enumerate(layer_data_list):
+            ax = fig.add_subplot(n_rows, n_cols, idx + 1, projection='3d')
+            
+            plot_data = layer_info['data']
+            layer_name = layer_info['name']
+            
+            # Downsample if too large
+            MAX_GRID = 50
+            h, w = plot_data.shape
             stride_h = max(1, h // MAX_GRID)
             stride_w = max(1, w // MAX_GRID)
-            
             plot_data_sub = plot_data[::stride_h, ::stride_w]
             
             # Coordinates
-            x = np.arange(0, w, stride_w)
-            y = np.arange(0, h, stride_h)
-            
-            # Ensure dimensions match (sometimes slice can be off by 1)
-            x = x[:plot_data_sub.shape[1]]
-            y = y[:plot_data_sub.shape[0]]
-            
+            x = np.arange(0, w, stride_w)[:plot_data_sub.shape[1]]
+            y = np.arange(0, h, stride_h)[:plot_data_sub.shape[0]]
             X, Y = np.meshgrid(x, y)
             Z = plot_data_sub
             
-            fig = plt.figure(figsize=(12, 8))
-            ax = fig.add_subplot(111, projection='3d')
+            # Plot with unified color scale
+            surf = ax.plot_surface(X, Y, Z, cmap='viridis', linewidth=0, 
+                                  edgecolor='none', alpha=0.9,
+                                  vmin=global_min, vmax=global_max)
             
-            # Plot surface
-            surf = ax.plot_surface(X, Y, Z, cmap='viridis', linewidth=0.5, edgecolor='none', alpha=0.9)
+            # Set unified z-axis limits
+            ax.set_zlim(global_min, global_max)
             
-            ax.set_xlabel(x_label, fontsize=10)
-            ax.set_ylabel(y_label, fontsize=10)
-            ax.set_zlabel('Value', fontsize=10)
+            # Compact labels
+            ax.set_xlabel(layer_info['x_label'], fontsize=7)
+            ax.set_ylabel(layer_info['y_label'], fontsize=7)
+            ax.set_zlabel('Value', fontsize=7)
+            ax.tick_params(labelsize=6)
             
-            title = f"{layer_name} - {cat_name} Structures ({prefix})"
-            if cat_name == 'Gradients' and gradient_clip_value is not None:
-                title += f"\n(clipped to ±{gradient_clip_value})"
-            ax.set_title(title, fontsize=11)
-            
-            # Add colorbar
-            fig.colorbar(surf, ax=ax, shrink=0.5, aspect=10)
+            # Shorter title
+            title = layer_name.split('.')[-1] if '.' in layer_name else layer_name
+            ax.set_title(title, fontsize=8, pad=5)
             
             # Adjust view
-            ax.view_init(elev=30, azim=-60)
-            
-            plt.tight_layout()
-            
-            safe_layer_name = layer_name.replace('/', '_').replace('.', '_')
-            save_path = os.path.join(save_dir, f"{prefix}_{safe_layer_name}_{cat_name.lower()}_structure_3d.png")
-            plt.savefig(save_path, dpi=100)
-            plt.close(fig)
-            
-            plot_count += 1
-            if plot_count >= 20: 
-                break
+            ax.view_init(elev=25, azim=-60)
         
-        logger.info(f"Generated {plot_count} 3D structure plots for {cat_name}")
+        # Add global title and colorbar
+        main_title = f"{cat_name} - All Layers ({prefix})"
+        if cat_name == 'Gradients' and gradient_clip_value is not None:
+            main_title += f" [Clipped ±{gradient_clip_value}]"
+        fig.suptitle(main_title, fontsize=14, fontweight='bold')
+        
+        # Add single colorbar for all subplots
+        fig.colorbar(surf, ax=fig.get_axes(), shrink=0.6, aspect=20, pad=0.05)
+        
+        plt.tight_layout(rect=[0, 0, 1, 0.98])
+        
+        save_path = os.path.join(save_dir, f"{prefix}_{cat_name.lower()}_combined_3d.png")
+        plt.savefig(save_path, dpi=150, bbox_inches='tight')
+        plt.close(fig)
+        
+        logger.info(f"Generated combined 3D plot for {cat_name} with {n_layers} layers (z-range: [{global_min:.4e}, {global_max:.4e}])")
+
+def analyze_quantization_difficulty(stats_collector, save_dir, prefix="", layer_filter=None):
+    """Analyze and rank layers by quantization difficulty"""
+    stats = stats_collector.get_final_stats()
+    
+    # DEBUG: Log what we have before filtering
+    logger.info(f"Stats before filtering: {len(stats)} total entries")
+    activation_keys_before = [k for k in stats.keys() if '.activation_out' in k]
+    logger.info(f"Activation keys before filtering: {len(activation_keys_before)}")
+    if activation_keys_before:
+        logger.info(f"Sample activation keys: {activation_keys_before[:5]}")
+    
+    # Filter stats if layer_filter is provided
+    stats = filter_stats_by_layers(stats, layer_filter)
+    
+    # DEBUG: Log what we have after filtering
+    logger.info(f"Stats after filtering: {len(stats)} total entries")
+    activation_keys_after = [k for k in stats.keys() if '.activation_out' in k]
+    logger.info(f"Activation keys after filtering: {len(activation_keys_after)}")
+    if activation_keys_after:
+        logger.info(f"Sample activation keys after filter: {activation_keys_after[:5]}")
+    
+    difficulties = []
+    
+    for key, stat in stats.items():
+        # Focus on weights and activations
+        if not (key.endswith('.weight') or key.endswith('.activation_out')):
+            continue
+        
+        layer_name = key.rsplit('.', 1)[0]
+        tensor_type = 'weight' if key.endswith('.weight') else 'activation'
+        
+        # Compute difficulty metrics
+        std = stat.get('std', 0)
+        mean = abs(stat.get('mean', 0))
+        min_val = stat.get('min', 0)
+        max_val = stat.get('max', 0)
+        
+        # Avoid division by zero
+        range_val = max_val - min_val
+        
+        # Expert metrics for quantization difficulty:
+        # 1. Dynamic range: large range needs more bits
+        dynamic_range = np.log10(range_val + 1e-10)
+        
+        # 2. Coefficient of variation: high CV means uneven distribution
+        cv = std / (abs(mean) + 1e-10)
+        
+        # 3. Outlier ratio: estimate from range vs std
+        outlier_metric = range_val / (std + 1e-10)
+        
+        # Combined difficulty score (higher = harder to quantize)
+        difficulty_score = dynamic_range * 0.3 + cv * 0.4 + np.log10(outlier_metric + 1) * 0.3
+        
+        difficulties.append({
+            'layer': layer_name,
+            'type': tensor_type,
+            'difficulty': difficulty_score,
+            'dynamic_range': dynamic_range,
+            'cv': cv,
+            'outlier_metric': outlier_metric,
+            'std': std,
+            'range': range_val
+        })
+    
+    # Sort by difficulty
+    difficulties.sort(key=lambda x: x['difficulty'], reverse=True)
+    
+    # Save report
+    report_path = os.path.join(save_dir, f"{prefix}_quantization_difficulty_report.txt")
+    with open(report_path, 'w') as f:
+        f.write("="*80 + "\n")
+        f.write(f"QUANTIZATION DIFFICULTY ANALYSIS - {prefix.upper()}\n")
+        f.write("="*80 + "\n\n")
+        f.write("Layers ranked by difficulty (hardest first):\n")
+        f.write("Higher scores indicate layers that are harder to quantize.\n\n")
+        f.write("Difficulty Factors:\n")
+        f.write("  - Dynamic Range: Large value ranges need more quantization levels\n")
+        f.write("  - Coeff. of Variation (CV): High CV indicates uneven distributions\n")
+        f.write("  - Outlier Metric: Presence of extreme values relative to typical values\n\n")
+        f.write("-"*80 + "\n")
+        f.write(f"{'Rank':<6}{'Layer':<50}{'Type':<12}{'Difficulty':<12}\n")
+        f.write("-"*80 + "\n")
+        
+        for rank, d in enumerate(difficulties[:30], 1):  # Top 30
+            f.write(f"{rank:<6}{d['layer']:<50}{d['type']:<12}{d['difficulty']:<12.3f}\n")
+        
+        f.write("\n" + "="*80 + "\n")
+        f.write("DETAILED METRICS FOR TOP 10 HARDEST LAYERS\n")
+        f.write("="*80 + "\n")
+        
+        for rank, d in enumerate(difficulties[:10], 1):
+            f.write(f"\n{rank}. {d['layer']} ({d['type']})\n")
+            f.write(f"   Difficulty Score:  {d['difficulty']:.3f}\n")
+            f.write(f"   Dynamic Range:     {d['dynamic_range']:.3f} (log scale)\n")
+            f.write(f"   Coeff. Variation:  {d['cv']:.3f}\n")
+            f.write(f"   Outlier Metric:    {d['outlier_metric']:.3f}\n")
+            f.write(f"   Std Dev:           {d['std']:.4e}\n")
+            f.write(f"   Value Range:       {d['range']:.4e}\n")
+        
+        f.write("\n" + "="*80 + "\n")
+        f.write("RECOMMENDATIONS\n")
+        f.write("="*80 + "\n")
+        f.write("1. Focus on layers with high difficulty scores for mixed-precision\n")
+        f.write("2. Layers with high CV may benefit from per-channel quantization\n")
+        f.write("3. Layers with high outlier metrics may need outlier clipping\n")
+        f.write("4. First/last layers often need higher precision (watch for them in top 10)\n")
+        f.write("5. Compare original vs quantized to see which layers lose most accuracy\n")
+    
+    logger.info(f"Quantization difficulty analysis saved to {report_path}")
+    return difficulties
 
 def run_stats(args):
     """Main stats collection function"""
@@ -698,7 +841,25 @@ def run_stats(args):
     GRADIENT_CLIP_VALUE = getattr(args, 'gradient_clip_value', 100)  # Default to 100
     logger.info(f"Using gradient clipping value: ±{GRADIENT_CLIP_VALUE} for visualization")
     
-    num_inference_batches = max(1, int(1 / args.batch_size))
+    # ==================== LAYER SELECTION CONFIGURATION ====================
+    #   None                                           - Analyze all layers
+    #   ["aggregator.frame_blocks.12", "camera_head"] - Multiple layer groups
+    SELECTED_LAYERS_CONFIG = [
+                "aggregator.frame_blocks.12", "aggregator.frame_blocks.13", 
+                "aggregator.frame_blocks.14", "aggregator.frame_blocks.15",
+                "aggregator.frame_blocks.16", "aggregator.frame_blocks.17",
+                "aggregator.global_blocks.12", "aggregator.global_blocks.13",
+                "aggregator.global_blocks.14", "aggregator.global_blocks.15",
+                "aggregator.global_blocks.16", "aggregator.global_blocks.17"
+            ]
+    
+    if SELECTED_LAYERS_CONFIG:
+        logger.info(f"Layer selection enabled: {SELECTED_LAYERS_CONFIG}")
+    else:
+        logger.info("Analyzing ALL layers (no filtering)")
+    # =======================================================================
+    
+    num_inference_batches = max(5, int(1 / args.batch_size))
 
     logger.debug("Run STATS arguments:\n", args)
     logger.info(f"Using GPU rank {args.gpu_rank} for stats")
@@ -727,6 +888,9 @@ def run_stats(args):
     original_net = original_net.to(args.device)
     original_net.eval()
     
+    # Expand layer specifications to include all sub-layers
+    original_layer_filter = expand_layer_names(original_net, SELECTED_LAYERS_CONFIG) if SELECTED_LAYERS_CONFIG else None
+    
     original_stats = collect_model_stats(args, original_net, dataloader, "original", num_inference_batches, MODULE_TYPES, LOG_TENSOR_SUFFIXES)
     
     # Collect gradients for original model (same number of batches as activations)
@@ -741,10 +905,14 @@ def run_stats(args):
                         gradient_clip_value=GRADIENT_CLIP_VALUE)
     
     # Plot box plots for original model
-    plot_layer_box_plots(original_stats, save_path, prefix="original", gradient_clip_value=GRADIENT_CLIP_VALUE)
+    plot_layer_box_plots(original_stats, save_path, prefix="original", gradient_clip_value=GRADIENT_CLIP_VALUE, layer_filter=original_layer_filter)
     
     # Plot 3D surface plots for original model
-    plot_3d_surface(original_stats, save_path, prefix="original", gradient_clip_value=GRADIENT_CLIP_VALUE)
+    plot_3d_surface(original_stats, save_path, prefix="original", gradient_clip_value=GRADIENT_CLIP_VALUE, layer_filter=original_layer_filter)
+    
+    # Analyze quantization difficulty for original model
+    logger.info("Analyzing quantization difficulty for original model...")
+    analyze_quantization_difficulty(original_stats, save_path, prefix="original", layer_filter=original_layer_filter)
     
     disk_usage = shutil.disk_usage(args.save_path)
     free_gb = disk_usage.free / (1024**3)
@@ -770,6 +938,9 @@ def run_stats(args):
     torch.set_grad_enabled(True)
     quantized_net.eval()
     
+    # Expand layer specifications for quantized model
+    quantized_layer_filter = expand_layer_names(quantized_net, SELECTED_LAYERS_CONFIG) if SELECTED_LAYERS_CONFIG else None
+    
     quantized_stats = collect_model_stats(args, quantized_net, dataloader, "quantized", num_inference_batches, MODULE_TYPES, LOG_TENSOR_SUFFIXES)
     
     # Collect gradients for quantized model (same number of batches as activations)
@@ -782,10 +953,14 @@ def run_stats(args):
                         gradient_clip_value=GRADIENT_CLIP_VALUE)
     
     # Plot box plots for quantized model
-    plot_layer_box_plots(quantized_stats, save_path, prefix="quantized", gradient_clip_value=GRADIENT_CLIP_VALUE)
+    plot_layer_box_plots(quantized_stats, save_path, prefix="quantized", gradient_clip_value=GRADIENT_CLIP_VALUE, layer_filter=quantized_layer_filter)
     
     # Plot 3D surface plots for quantized model
-    plot_3d_surface(quantized_stats, save_path, prefix="quantized", gradient_clip_value=GRADIENT_CLIP_VALUE)
+    plot_3d_surface(quantized_stats, save_path, prefix="quantized", gradient_clip_value=GRADIENT_CLIP_VALUE, layer_filter=quantized_layer_filter)
+    
+    # Analyze quantization difficulty for quantized model
+    logger.info("Analyzing quantization difficulty for quantized model...")
+    analyze_quantization_difficulty(quantized_stats, save_path, prefix="quantized", layer_filter=quantized_layer_filter)
     
     logger.info("=" * 50)
     logger.info("CREATING COMPARISON HISTOGRAMS")

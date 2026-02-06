@@ -3,50 +3,46 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 
+# Global variables for VGGT context (set by Aggregator during forward pass)
+_vggt_num_frames = None
+_vggt_tokens_per_frame = None
+
 #----------------------------------------------------------
-# LSQ Channel - Enhanced for W8A8 QAT
+# LSQC - Learned Step-Size Quantization with Per-Channel Scales
 #
-# Key Improvements for Better W8A8 Performance:
+# Learnable quantization scales:
+#   Weight scales: [d_out, 1] for Linear, [d_out, 1, 1, 1] for Conv2d
+#     - One learnable scale per output channel (fixed)
 #
-# 1. LEARNED PER-CHANNEL ACTIVATION SCALES [1, d_in]
-#    - Replaced dynamic per-token scales with learned per-channel scales
-#    - Provides stable gradients during QAT training
-#    - Hardware-friendly: aligns with weight scales [d_out, 1]
-#    - Supports 2D [batch, d_in], 3D [batch, seq_len, d_in], and 4D [batch, C, H, W]
+#   Activation scales (lazy initialization):
+#     - Base scale structure: [1, num_special + 1, 1]
+#       * num_special individual learnable scales (e.g., 5 for 1 camera + 4 registers)
+#       * 1 shared learnable scale for ALL patch tokens (resolution-independent)
+#     - Expansion: Shared patch scale broadcast to match actual number of patches
+#       * Works with any image resolution
+#       * Frame attention: [special_scales, patch_scale × N_patches]
+#       * Global attention: Same pattern replicated per frame
+#     - Each special token has its own scale, all patches share one scale
+#     - Gradients from all patch tokens flow back to single shared patch scale
+#     - Compatible with INT8 matmul (scales applied after matmul)
 #
-# 2. SMOOTHQUANT CHANNEL BALANCING (applied in module_quantization.py)
-#    - Learnable channel-wise scale [1, d_in] 
-#    - Redistributes quantization difficulty: weight *= s, activation /= s
-#    - Critical for handling outliers in activation channels
-#    - Orthogonal to quantization scales - works on different axis
-#
-# 3. LEARNABLE CLIPPING (LAC/LWC)
-#    - Optional learnable clipping factors per channel
-#    - Handles outliers without wasting quantization range
-#    - Sigmoid-gated for stable training
-#
-# 4. HARDWARE-EFFICIENT SCALE AXES
-#    - Weight scales: [d_out, 1] - one scale per output channel
-#    - Activation scales: [1, d_in] - one scale per input channel
-#    - Enables efficient INT8 matrix multiplication
-#
-# Usage:
-#   - enable_learnable_clip=True: Activates LAC/LWC for outlier handling
-#   - SmoothQuant balancing is automatic when using LSQC in module_quantization.py
+# Use case (VGGT):
+#   - Initialize with any resolution: learns 5 special + 1 patch scale
+#   - Works with variable image sizes during training/inference
+#   - Hardware-efficient: Y = (X_int8 @ W_int8^T) * scale_x * scale_w
 #
 # References:
 #   - LSQ: Learned Step Size Quantization (Esser et al., 2019)
-#   - SmoothQuant: Xiao et al., 2022
-#   - QuaRot: Ashkboos et al., 2024 (LAC/LWC concepts)
+#   - VGGT: Visual Geometry Grounded Transformer
 #----------------------------------------------------------
 class LSQC_quantizer(nn.Module):
-    def __init__(self, module, num_bits, mode, scale_shape=None, 
-                 enable_smooth_quant=False, enable_learnable_clip=False, **kwargs):
+    def __init__(self, module, num_bits, mode, scale_shape=None, num_special_tokens=5, **kwargs):
         super(LSQC_quantizer, self).__init__()
         self.mode = mode
-        self.scale_shape = scale_shape if scale_shape is not None else (1,)
-        self.enable_smooth_quant = enable_smooth_quant
-        self.enable_learnable_clip = enable_learnable_clip
+        self.scale_shape = scale_shape
+        self.lazy_init = (scale_shape is None and mode == "activation")  # Lazy init for activations
+        self.base_dim = None  # Base dimension for replication (set during first forward)
+        self.num_special_tokens = num_special_tokens  # Number of special tokens (camera + register)
         
         if isinstance(module, nn.Conv2d):
             self.dim_reduction = 1
@@ -57,7 +53,6 @@ class LSQC_quantizer(nn.Module):
 
     def params_set(self, module, num_bits, mode):
         if mode == "activation":
-            # Learned per-channel quantization scales for stable training
             if module.first_layer:
                 module.x_Qn = 2 ** (num_bits-1)
                 module.x_Qp = 2 ** (num_bits-1) - 1
@@ -65,85 +60,61 @@ class LSQC_quantizer(nn.Module):
                 module.x_Qn = 2 ** (num_bits-1)
                 module.x_Qp = 2 ** (num_bits-1) - 1
             
-            # Learned quantization scale parameter
-            module.x_scale = nn.Parameter(torch.zeros(self.scale_shape, dtype=torch.float32))
-            module.x_Qparms['scale'] = module.x_scale
-            
-            # Optional: Learnable clipping factors for activation outliers
-            if self.enable_learnable_clip:
-                init_value = 4.0
-                module.x_clip_max = nn.Parameter(torch.ones(self.scale_shape) * init_value)
-                module.x_clip_min = nn.Parameter(torch.ones(self.scale_shape) * init_value)
-                module.x_Qparms['clip_max'] = module.x_clip_max
-                module.x_Qparms['clip_min'] = module.x_clip_min
+            # Lazy initialization - scale created in first forward pass
+            if not self.lazy_init:
+                self.scale_shape = self.scale_shape if self.scale_shape is not None else (1,)
+                module.x_scale = nn.Parameter(torch.zeros(self.scale_shape, dtype=torch.float32))
+                module.x_Qparms['scale'] = module.x_scale
+            # else: scale will be created in forward based on input shape
             
         elif mode == "weight":
             module.w_Qn = 2 ** (num_bits-1)
             module.w_Qp = 2 ** (num_bits-1) - 1
+            self.scale_shape = self.scale_shape if self.scale_shape is not None else (1,)
             module.w_scale = nn.Parameter(torch.zeros(self.scale_shape, dtype=torch.float32))
             module.w_Qparms['scale'] = module.w_scale
-            
-            # Optional: Learnable clipping factors for weight outliers
-            if self.enable_learnable_clip:
-                init_value = 4.0
-                module.w_clip_max = nn.Parameter(torch.ones(self.scale_shape) * init_value)
-                module.w_clip_min = nn.Parameter(torch.ones(self.scale_shape) * init_value)
-                module.w_Qparms['clip_max'] = module.w_clip_max
-                module.w_Qparms['clip_min'] = module.w_clip_min
 
     def forward(self, x, Qparms, Qn, Qp, num_elements, grad_scale_mode):
-        if self.mode == "activation":
-            # Learned per-channel quantization (stable for QAT training)
-            scale = Qparms['scale']
-            
-            # Optional: Apply learnable clipping to handle outliers
-            if self.enable_learnable_clip and 'clip_max' in Qparms:
-                clip_max = Qparms['clip_max']
-                clip_min = Qparms['clip_min']
-                sigmoid = torch.nn.functional.sigmoid
-                
-                # Get per-channel max/min based on input shape
-                if len(x.shape) == 2:  # Linear: [batch, d_in]
-                    xmax = x.amax(0, keepdim=True)  # [1, d_in]
-                    xmin = x.amin(0, keepdim=True)  # [1, d_in]
-                elif len(x.shape) == 3:  # Transformer Linear: [batch, seq_len, d_in]
-                    xmax = x.amax((0, 1), keepdim=True)  # [1, 1, d_in]
-                    xmin = x.amin((0, 1), keepdim=True)  # [1, 1, d_in]
-                else:  # Conv2d: [batch, channels, H, W]
-                    xmax = x.amax((0, 2, 3), keepdim=True)  # [1, channels, 1, 1]
-                    xmin = x.amin((0, 2, 3), keepdim=True)  # [1, channels, 1, 1]
-                
-                # Apply learnable clipping
-                xmax_clipped = xmax * sigmoid(clip_max)
-                xmin_clipped = xmin * sigmoid(clip_min)
-                x = torch.clamp(x, min=xmin_clipped, max=xmax_clipped)
-            
-            # Quantize with learned scale
-            yq = _LSQC_quantizer(x, scale, Qn, Qp, num_elements, grad_scale_mode)
-            y = yq * scale
-            return y
+        # Get learnable base scale
+        base_scale = Qparms['scale']
         
-        # Weight quantization: per-channel with learned scales
-        scale = Qparms['scale']
-        
-        # Optional: Apply learnable clipping to handle outliers
-        if self.enable_learnable_clip and 'clip_max' in Qparms:
-            clip_max = Qparms['clip_max']
-            clip_min = Qparms['clip_min']
-            sigmoid = torch.nn.functional.sigmoid
+        # For lazy-initialized activations with special token handling:
+        # Structure: [num_special_tokens individual scales] + [1 shared scale for all patches]
+        # Example: [s_cam, s_reg1, s_reg2, s_reg3, s_reg4, s_patch_shared]
+        if self.lazy_init and self.num_special_tokens > 0 and len(x.shape) >= 3:
+            current_dim = x.shape[-2]
             
-            # Get per-channel max/min for weights
-            if len(x.shape) == 2:  # Linear weights: [d_out, d_in]
-                wmax = x.amax(1, keepdim=True)  # [d_out, 1]
-                wmin = x.amin(1, keepdim=True)  # [d_out, 1]
-            else:  # Conv2d weights: [d_out, d_in, k, k]
-                wmax = x.amax((1, 2, 3), keepdim=True)  # [d_out, 1, 1, 1]
-                wmin = x.amin((1, 2, 3), keepdim=True)  # [d_out, 1, 1, 1]
+            # base_scale should always be [1, num_special + 1, 1]
+            # Split into special token scales and shared patch scale
+            if base_scale.shape[1] == self.num_special_tokens + 1:
+                # Correct format: [num_special + 1]
+                special_scales = base_scale[:, :self.num_special_tokens, :]  # [1, 5, 1]
+                patch_scale = base_scale[:, self.num_special_tokens:, :]      # [1, 1, 1]
+            else:
+                # Legacy format or initialization: base_scale shape [1, base_dim, 1]
+                # Need to reshape to new format
+                special_scales = base_scale[:, :self.num_special_tokens, :]
+                # Average all patch scales into one shared scale
+                patch_scale = base_scale[:, self.num_special_tokens:, :].mean(dim=1, keepdim=True)
             
-            # Apply learnable clipping
-            wmax_clipped = wmax * sigmoid(clip_max)
-            wmin_clipped = wmin * sigmoid(clip_min)
-            x = torch.clamp(x, min=wmin_clipped, max=wmax_clipped)
+            # Try to get P (tokens per frame) from global VGGT context
+            per_frame_dim = _vggt_tokens_per_frame
+            
+            if per_frame_dim is not None and current_dim > per_frame_dim:
+                # Global attention: current_dim = S × P, replicate pattern
+                num_patches_per_frame = per_frame_dim - self.num_special_tokens
+                patch_scales_per_frame = patch_scale.expand(1, num_patches_per_frame, -1)
+                frame_pattern = torch.cat([special_scales, patch_scales_per_frame], dim=1)
+                
+                num_frames = current_dim // per_frame_dim
+                scale = frame_pattern.repeat(1, num_frames, 1)
+            else:
+                # Frame attention: build pattern for current_dim
+                num_patches_current = current_dim - self.num_special_tokens
+                patch_scales_expanded = patch_scale.expand(1, num_patches_current, -1)
+                scale = torch.cat([special_scales, patch_scales_expanded], dim=1)
+        else:
+            scale = base_scale
         
         yq = _LSQC_quantizer(x, scale, Qn, Qp, num_elements, grad_scale_mode)
         y = yq * scale
@@ -152,17 +123,37 @@ class LSQC_quantizer(nn.Module):
     def scale_to_Qparms(self, Qparms, Qn, Qp):
         # Initialize learned quantization scales from calibration
         if "init_scale" in Qparms and "scale" in Qparms:
-            if Qparms["init_scale"].numel() == 1:
-                Qparms["scale"].data.fill_(Qparms["init_scale"].item())
-            elif Qparms["init_scale"].shape == Qparms["scale"].shape:
-                Qparms["scale"].data.copy_(Qparms["init_scale"])
+            init_scale = Qparms["init_scale"]
+            target_scale = Qparms["scale"]
+            
+            if init_scale.numel() == 1:
+                # Scalar initialization - fill all scales
+                target_scale.data.fill_(init_scale.item())
+            elif init_scale.shape == target_scale.shape:
+                # Same shape - direct copy
+                target_scale.data.copy_(init_scale)
             else:
-                # Handle shape mismatch - broadcast if possible
-                try:
-                    Qparms["scale"].data.copy_(Qparms["init_scale"].expand_as(Qparms["scale"]))
-                except:
-                    # Fallback: use scalar value
-                    Qparms["scale"].data.fill_(Qparms["init_scale"].mean().item())
+                # Shape mismatch - need to handle conversion
+                if self.lazy_init and self.num_special_tokens > 0:
+                    # Convert from full per-token scales to special + shared format
+                    # init_scale: [1, base_dim, 1] -> target: [1, num_special + 1, 1]
+                    if init_scale.shape[1] >= self.num_special_tokens + 1:
+                        # Copy special token scales
+                        target_scale.data[:, :self.num_special_tokens, :] = \
+                            init_scale[:, :self.num_special_tokens, :]
+                        # Average patch scales into shared patch scale
+                        target_scale.data[:, self.num_special_tokens:, :] = \
+                            init_scale[:, self.num_special_tokens:, :].mean(dim=1, keepdim=True)
+                    else:
+                        # Fallback: use mean value
+                        target_scale.data.fill_(init_scale.mean().item())
+                else:
+                    # Standard case: broadcast if possible
+                    try:
+                        target_scale.data.copy_(init_scale.expand_as(target_scale))
+                    except:
+                        # Fallback: use scalar value
+                        target_scale.data.fill_(init_scale.mean().item())
 
 def _LSQC_quantizer(x, scale, Qn, Qp, num_elements, grad_scale_mode):
 

@@ -322,7 +322,7 @@ def run_distill_vggt(rank, args):
     os.environ["RANK"] = str(rank)
     os.environ["WORLD_SIZE"] = str(args.world_size)
     os.environ["MASTER_ADDR"] = "localhost"
-    os.environ["MASTER_PORT"] = "12399"
+    os.environ["MASTER_PORT"] = "12398"
     os.environ["NCCL_P2P_DISABLE"] = "1"
 
     os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
@@ -567,6 +567,25 @@ def get_config():
         #    "alpha": 0.7,
         #    "beta": 0.3
         #},
+        # {
+        #     "name": "blocks_12_17",
+        #     "layers": [
+        #         "aggregator.frame_blocks.12", "aggregator.frame_blocks.13", 
+        #         "aggregator.frame_blocks.14", "aggregator.frame_blocks.15",
+        #         "aggregator.frame_blocks.16", "aggregator.frame_blocks.17",
+        #         "aggregator.global_blocks.12", "aggregator.global_blocks.13",
+        #         "aggregator.global_blocks.14", "aggregator.global_blocks.15",
+        #         "aggregator.global_blocks.16", "aggregator.global_blocks.17"
+        #     ],
+        #     "hook_points": [
+        #         "aggregator.frame_blocks[17]",
+        #         "aggregator.global_blocks[17]"
+        #     ],
+        #     "epochs": 0,
+        #     "lr": 1e-3,
+        #     "alpha": 1.0,
+        #     "beta": 0.0
+        # },
         {
             "name": "blocks_12_17",
             "layers": [
@@ -578,11 +597,21 @@ def get_config():
                 "aggregator.global_blocks.16", "aggregator.global_blocks.17"
             ],
             "hook_points": [
+                "aggregator.frame_blocks[12]",
+                "aggregator.global_blocks[12]",
+                "aggregator.frame_blocks[13]",
+                "aggregator.global_blocks[13]",
+                "aggregator.frame_blocks[14]",
+                "aggregator.global_blocks[14]",
+                "aggregator.frame_blocks[15]",
+                "aggregator.global_blocks[15]",
+                "aggregator.frame_blocks[16]",
+                "aggregator.global_blocks[16]",
                 "aggregator.frame_blocks[17]",
                 "aggregator.global_blocks[17]"
             ],
-            "epochs": 0,
-            "lr": 1e-3,
+            "epochs": 15,
+            "lr": 1e-4,
             "alpha": 1.0,
             "beta": 0.0
         },
@@ -610,7 +639,7 @@ def get_config():
                 "aggregator.frame_blocks[17]",
                 "aggregator.global_blocks[17]"
             ],
-            "epochs": 30,
+            "epochs": 15,
             "lr": 1e-3,
             "alpha": 0.0,
             "beta": 1.0

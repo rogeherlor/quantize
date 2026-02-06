@@ -33,10 +33,8 @@ class QLinear(nn.Linear):
 
         if w_quantizer is not None and w_quantizer.__name__ == "LSQC_quantizer":
             self.w_scale_shape = (out_features, 1)
-            # Enable learnable clipping for weights (helps with outliers)
             self.w_quantizer = w_quantizer(self, num_bits, "weight", 
-                                          scale_shape=self.w_scale_shape,
-                                          enable_learnable_clip=True)
+                                          scale_shape=self.w_scale_shape)
         elif w_quantizer is not None:
             self.w_scale_shape = (1,)
             self.w_quantizer = w_quantizer(self, num_bits, "weight")
@@ -44,24 +42,16 @@ class QLinear(nn.Linear):
             self.w_quantizer = None
 
         if x_quantizer is not None and x_quantizer.__name__ == "LSQC_quantizer":
-            # Learned per-channel activation quantization for stable QAT training
-            self.x_scale_shape = (1, in_features)
+            # Per-token learnable scales - will be initialized in first forward pass
+            # Shape will be [1, num_special + 1, 1] for special tokens + shared patch scale
+            self.x_scale_shape = None  # Lazy initialization
             self.x_quantizer = x_quantizer(self, num_bits, "activation",
-                                          scale_shape=self.x_scale_shape,
-                                          enable_smooth_quant=False,
-                                          enable_learnable_clip=True)
-            
-            # SmoothQuant-style channel balancing [1, d_in]
-            # Redistributes quantization difficulty between weights and activations
-            self.smooth_scale = nn.Parameter(torch.ones((1, in_features), dtype=torch.float32))
-            self.use_smooth_quant = True
+                                          scale_shape=None, num_special_tokens=5)
         elif x_quantizer is not None:
             self.x_scale_shape = (1,)
             self.x_quantizer = x_quantizer(self, num_bits, "activation")
-            self.use_smooth_quant = False
         else:
             self.x_quantizer = None
-            self.use_smooth_quant = False
 
         self.w_initializer= w_initializer
         self.x_initializer= x_initializer
@@ -101,10 +91,8 @@ class QConv2d(nn.Conv2d):
 
         if w_quantizer is not None and w_quantizer.__name__ == "LSQC_quantizer":
             self.w_scale_shape = (out_channels, 1, 1, 1)
-            # Enable learnable clipping for weights (helps with outliers)
             self.w_quantizer = w_quantizer(self, num_bits, "weight", 
-                                          scale_shape=self.w_scale_shape,
-                                          enable_learnable_clip=True)
+                                          scale_shape=self.w_scale_shape)
         elif w_quantizer is not None:
             self.w_scale_shape = (1,)
             self.w_quantizer = w_quantizer(self, num_bits, "weight")
@@ -112,24 +100,16 @@ class QConv2d(nn.Conv2d):
             self.w_quantizer = None
 
         if x_quantizer is not None and x_quantizer.__name__ == "LSQC_quantizer":
-            # Learned per-channel activation quantization for stable QAT training
-            self.x_scale_shape = (1, in_channels, 1, 1)
+            # Per-spatial learnable scales - will be initialized in first forward pass
+            # For Conv2d, no special token handling needed
+            self.x_scale_shape = None  # Lazy initialization
             self.x_quantizer = x_quantizer(self, num_bits, "activation",
-                                          scale_shape=self.x_scale_shape,
-                                          enable_smooth_quant=False,
-                                          enable_learnable_clip=True)
-            
-            # SmoothQuant-style channel balancing [1, channels, 1, 1]
-            # Redistributes quantization difficulty between weights and activations
-            self.smooth_scale = nn.Parameter(torch.ones((1, in_channels, 1, 1), dtype=torch.float32))
-            self.use_smooth_quant = True
+                                          scale_shape=None, num_special_tokens=0)
         elif x_quantizer is not None:
             self.x_scale_shape = (1,)
             self.x_quantizer = x_quantizer(self, num_bits, "activation")
-            self.use_smooth_quant = False
         else:
             self.x_quantizer = None
-            self.use_smooth_quant = False
 
         self.w_initializer= w_initializer
         self.x_initializer= x_initializer
@@ -153,6 +133,27 @@ def _forward_common(module, input):
     if module.init_state == False:
         if module.x_quantizer != None and module.x_initializer != None:
             Qparms_to_dev(input, module.x_Qparms)
+            
+            # Lazy initialization of activation scale shape based on input dim -2
+            if hasattr(module.x_quantizer, 'lazy_init') and module.x_quantizer.lazy_init:
+                if len(input.shape) >= 3:
+                    base_dim = input.shape[-2]
+                    # Store base dimension for replication (per-frame token count in VGGT)
+                    # In VGGT: base_dim = P tokens per frame (camera + register + patches)
+                    # Frame attention: (B*S, P, C) - uses base_dim directly
+                    # Global attention: (B, S*P, C) - base_dim replicated S times
+                    module.x_quantizer.base_dim = base_dim
+                    # Create base scale vector: [1, num_special + 1, 1]
+                    # num_special individual scales + 1 shared scale for all patches
+                    num_scales = module.x_quantizer.num_special_tokens + 1
+                    scale_shape = [1, num_scales] + [1] * (len(input.shape) - 2)
+                else:
+                    module.x_quantizer.base_dim = 1
+                    scale_shape = [1, 1]
+                module.x_scale = nn.Parameter(torch.zeros(scale_shape, dtype=torch.float32, device=input.device))
+                module.x_Qparms['scale'] = module.x_scale
+                module.x_quantizer.scale_shape = tuple(scale_shape)
+            
             if module.first_layer:                
                 module.x_initializer(input, module.x_Qparms, module.x_Qn, module.x_Qp, module.x_quantizer, "symmetric")
             else:
@@ -163,13 +164,6 @@ def _forward_common(module, input):
             Qparms_to_dev(weight, module.w_Qparms)
             module.w_initializer(weight, module.w_Qparms, module.w_Qn, module.w_Qp, module.w_quantizer, "symmetric")            
             module.w_quantizer.scale_to_Qparms(module.w_Qparms, module.w_Qn, module.w_Qp)
-
-    # SmoothQuant-style channel balancing (if enabled)
-    # Redistributes quantization difficulty between weights and activations
-    if hasattr(module, 'use_smooth_quant') and module.use_smooth_quant:
-        # Apply balancing: weight *= smooth_scale, activation /= smooth_scale
-        weight = weight * module.smooth_scale
-        input = input / module.smooth_scale
 
     if module.x_quantizer != None:
         x_numel = input.numel()

@@ -2,22 +2,11 @@
 # import modules 
 #========================================================================
 import os
-import torch
 import time
 import yaml
 import argparse
 
-from src.logger import logger
-from src.utils import *
-
-from src.quantizer.uniform import *
-from src.quantizer.nonuniform import *
-from src.initializer import *
-from src.run_qat import run_qat
-from src.run_stats import run_stats
-from src.run_ptq import run_ptq
-from src.run_distill import run_distill
-from src.run_realquant import run_realquant
+from src.utils import dotdict
 
 if __name__ == '__main__':
     with open('./config/imagenet/LSQ_base.yaml') as file:
@@ -26,6 +15,18 @@ if __name__ == '__main__':
 
     # Before any torch operations
     os.environ["CUDA_VISIBLE_DEVICES"] = str(config.gpu_rank)
+    import torch
+    from src.logger import logger
+    from src.utils import *
+
+    from src.quantizer.uniform import *
+    from src.quantizer.nonuniform import *
+    from src.initializer import *
+    from src.run_qat import run_qat
+    from src.run_stats import run_stats
+    from src.run_ptq import run_ptq
+    from src.run_distill import run_distill
+    from src.run_realquant import run_realquant
 
     config.world_size = torch.cuda.device_count()
     config.device = "cuda" if torch.cuda.is_available() else "cpu"

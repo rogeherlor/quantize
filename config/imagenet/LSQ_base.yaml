@@ -36,7 +36,7 @@ pre_trained: True
 evaluation_mode: False
 write_log: True
 ddp: False
-gpu_rank: 0 # Can be multiple ranks: 0,1
+gpu_rank: 1 # Can be multiple ranks: 0,1
 invisible_pgb: False
 save_path: output
 save_mode: xxxall_checkpoints
