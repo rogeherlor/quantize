@@ -610,7 +610,7 @@ def get_config():
                 "aggregator.frame_blocks[17]",
                 "aggregator.global_blocks[17]"
             ],
-            "epochs": 15,
+            "epochs": 50,
             "lr": 1e-4,
             "alpha": 1.0,
             "beta": 0.0
@@ -639,7 +639,7 @@ def get_config():
                 "aggregator.frame_blocks[17]",
                 "aggregator.global_blocks[17]"
             ],
-            "epochs": 15,
+            "epochs": 30,
             "lr": 1e-3,
             "alpha": 0.0,
             "beta": 1.0

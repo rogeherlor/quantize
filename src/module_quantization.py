@@ -143,9 +143,10 @@ def _forward_common(module, input):
                     # Frame attention: (B*S, P, C) - uses base_dim directly
                     # Global attention: (B, S*P, C) - base_dim replicated S times
                     module.x_quantizer.base_dim = base_dim
-                    # Create base scale vector: [1, num_special + 1, 1]
-                    # num_special individual scales + 1 shared scale for all patches
-                    num_scales = module.x_quantizer.num_special_tokens + 1
+                    # Create base scale vector: [1, 2 * (num_special + 1), 1]
+                    # First 6: frame1 (5 special + 1 patch)
+                    # Next 6: frames 2+ (5 special + 1 patch)
+                    num_scales = 2 * (module.x_quantizer.num_special_tokens + 1)  # 2 * 6 = 12
                     scale_shape = [1, num_scales] + [1] * (len(input.shape) - 2)
                 else:
                     module.x_quantizer.base_dim = 1
