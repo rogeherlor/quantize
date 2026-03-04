@@ -334,7 +334,7 @@ def run_distill_vggt(rank, args):
         cfg = compose(config_name="default")
 
     logger.info("Applying memory optimizations for distillation:")
-    cfg.limit_train_batches = 400
+    cfg.limit_train_batches = 800 # 400
     cfg.limit_val_batches = 100
     logger.info(f"  - Reduced limit_train_batches: 800 -> {cfg.limit_train_batches}")
     logger.info(f"  - Reduced limit_val_batches: 400 -> {cfg.limit_val_batches}")
@@ -379,7 +379,7 @@ def run_distill_vggt(rank, args):
     for param in teacher_model.parameters():
         param.requires_grad = False
 
-    run_evaluation_vggt(teacher_model)
+    ## run_evaluation_vggt(teacher_model)
     
     # Distill Single combined loss
     task_loss = student_trainer.loss
@@ -446,15 +446,6 @@ def run_distill_vggt(rank, args):
         )
         
         # 6. Reconstruct optimizers for current stage
-        if args.different_optimizer_mode:
-            sparams, params = split_params(\
-                student_trainer.model.module, weight_decay=args.weight_decay, lr = args.lr, x_lr= args.x_step_size_lr, \
-                    w_lr= args.w_step_size_lr, x_wd = args.x_step_size_wd, w_wd = args.w_step_size_wd)
-            soptimizer, sscheduler = scheduler_optimizer_class(args, sparams, args.step_size_optimizer)
-            student_trainer.s_optimizer = soptimizer
-            student_trainer.s_scheduler = sscheduler
-        
-        # Reconstruct optimizer to ONLY update current stage parameters
         # Filter parameters: only those in current stage layers
         stage_param_names = set()
         for layer_name in stage['layers']:
@@ -462,44 +453,155 @@ def run_distill_vggt(rank, args):
                 if layer_name in name:
                     stage_param_names.add(name)
         
-        stage_params = [p for n, p in student_model.named_parameters() if n in stage_param_names]
-        stage_param_count = sum(p.numel() for p in stage_params)
-        logger.info(f"Optimizer will update {len(stage_params)} parameter tensors ({stage_param_count:,} values) from stage '{stage['name']}'")
+        # Separate quantization parameters from weight parameters if different_optimizer_mode is enabled
+        if args.different_optimizer_mode:
+            # Identify quantization parameters: scales (x_scale, w_scale) and offsets (x_offset, w_offset)
+            quant_param_names = {n for n in stage_param_names 
+                                 if (('x_scale' in n or 'w_scale' in n or 'x_offset' in n or 'w_offset' in n) 
+                                     and ('scale' in n or 'offset' in n))}
+            weight_param_names = stage_param_names - quant_param_names
+            
+            # Create separate optimizer for quantization params (scales + offsets) with scale-specific LR
+            quant_params = [p for n, p in student_model.named_parameters() if n in quant_param_names]
+            stage_scale_lr = stage.get('scale_lr', args.x_step_size_lr)  # Use stage scale_lr or fallback to args
+            
+            if quant_params:
+                # Create parameter groups with correct LR and weight decay (matching QAT's split_params format)
+                # Format: [{'params': [...], 'lr': X, 'weight_decay': Y}]
+                qparm_wd = getattr(args, 'x_step_size_wd', 0.0)  # Use x_step_size_wd (set from qparm_wd in main.py)
+                quant_param_groups = [{
+                    'params': quant_params,
+                    'lr': stage_scale_lr,
+                    'weight_decay': qparm_wd,
+                    'after_lr': stage_scale_lr  # For scheduler compatibility
+                }]
+                
+                # Create quantization parameter optimizer using same approach as QAT
+                from src.scheduler_optimizer_class import scheduler_optimizer_class
+                
+                # Ensure args has weight_decay for scheduler_optimizer_class
+                # (it uses args.weight_decay as default, parameter groups override per-group)
+                if not hasattr(args, 'weight_decay') or args.weight_decay is None:
+                    args.weight_decay = 0.0
+                
+                soptimizer, sscheduler = scheduler_optimizer_class(
+                    args, 
+                    quant_param_groups,
+                    getattr(args, 'step_size_optimizer', args.optimizer)
+                )
+                
+                # Simple assignment - trainer handles stepping at epoch boundaries
+                student_trainer.s_optimizer = soptimizer
+                student_trainer.s_scheduler = sscheduler
+                
+                quant_param_count = sum(p.numel() for p in quant_params)
+                logger.info(f"Quantization optimizer will update {len(quant_params)} param tensors (scales+offsets: {quant_param_count:,} values) with lr={stage_scale_lr}, wd={qparm_wd}")
+            else:
+                student_trainer.s_optimizer = None
+                student_trainer.s_scheduler = None
+            
+            # Use only weight parameters for main optimizer
+            stage_params = [p for n, p in student_model.named_parameters() if n in weight_param_names]
+            stage_param_count = sum(p.numel() for p in stage_params)
+            logger.info(f"Weight optimizer will update {len(stage_params)} weight tensors ({stage_param_count:,} values) from stage '{stage['name']}'")
+        else:
+            # Original behavior: single optimizer for all parameters
+            stage_params = [p for n, p in student_model.named_parameters() if n in stage_param_names]
+            stage_param_count = sum(p.numel() for p in stage_params)
+            student_trainer.s_optimizer = None
+            student_trainer.s_scheduler = None
+            logger.info(f"Optimizer will update {len(stage_params)} parameter tensors ({stage_param_count:,} values) from stage '{stage['name']}'")
         
-        # Create optimizer using the original configuration but for stage parameters only
+        # Create optimizer for weight parameters (or all if different_optimizer_mode is False)
         # This respects the optimizer type (AdamW, etc.) and other settings from config
         from hydra.utils import instantiate
-        optimizer_conf = student_trainer.optim_conf.optimizer.copy()
-        # Override LR if specified in stage config
-        if 'lr' in stage:
-            optimizer_conf['lr'] = stage['lr']
-            
-        logger.info(f"Creating optimizer {optimizer_conf['_target_']} with lr={optimizer_conf['lr']}")
-        optimizer = instantiate(optimizer_conf, params=stage_params)
+        from src.models.depth.vggt.training.train_utils.optimizer import construct_optimizer
         
-        # Wrap in the expected format
-        from collections import namedtuple
-        OptimWrapper = namedtuple('OptimWrapper', ['optimizer', 'schedulers', 'step_schedulers', 'zero_grad'])
-        student_trainer.optims = [
-            OptimWrapper(
-                optimizer=optimizer,
-                schedulers=[{}],  # No scheduler for now
-                step_schedulers=lambda x: None,  # No-op
-                # CRITICAL: Zero grad for the WHOLE model, not just optimizer params.
-                # Otherwise, gradients for non-updated layers will accumulate and break gradient clipping.
-                zero_grad=lambda **kwargs: student_model.zero_grad(**kwargs)
-            )
-        ]
+        # Override LR if specified in stage config
+        stage_weight_lr = stage.get('lr', student_trainer.optim_conf.optimizer.get('lr', 1e-4))
+        optimizer_conf = student_trainer.optim_conf.optimizer.copy()
+        optimizer_conf['lr'] = stage_weight_lr
+        
+        # CRITICAL: Override scheduler config with stage-specific values
+        import copy
+        stage_options = copy.deepcopy(student_trainer.optim_conf.options)
+        
+        if 'lr' in stage_options and stage_options['lr']:
+            for lr_config in stage_options['lr']:
+                if 'scheduler' in lr_config:
+                    # Get stage-specific scheduler parameters with fallbacks to stage_weight_lr
+                    warmup_start = stage.get('warmup_start_value', 1e-6)
+                    warmup_end = stage.get('warmup_end_value', stage_weight_lr)
+                    cosine_start = stage.get('cosine_start_value', stage_weight_lr)
+                    cosine_end = stage.get('cosine_end_value', 1e-6)
+                    lengths = stage.get('scheduler_lengths', [0.05, 0.95])
+                    
+                    schedulers = lr_config['scheduler']['schedulers']
+                    
+                    # Update LinearParamScheduler (warmup phase)
+                    if len(schedulers) > 0 and '_target_' in schedulers[0]:
+                        if 'LinearParamScheduler' in schedulers[0]['_target_']:
+                            schedulers[0]['start_value'] = warmup_start
+                            schedulers[0]['end_value'] = warmup_end
+                    
+                    # Update CosineParamScheduler (main training phase)
+                    if len(schedulers) > 1 and '_target_' in schedulers[1]:
+                        if 'CosineParamScheduler' in schedulers[1]['_target_']:
+                            schedulers[1]['start_value'] = cosine_start
+                            schedulers[1]['end_value'] = cosine_end
+                    
+                    # Update scheduler lengths (warmup fraction, cosine fraction)
+                    lr_config['scheduler']['lengths'] = lengths
+                    
+                    logger.info(f"Scheduler config: warmup({warmup_start}->{warmup_end}), cosine({cosine_start}->{cosine_end}), lengths={lengths}")
+            
+        logger.info(f"Creating weight optimizer {optimizer_conf['_target_']} with lr={stage_weight_lr}")
+        
+        # Create a temporary model-like object with only stage parameters
+        # This allows us to use construct_optimizer's scheduler logic
+        class TempModel(nn.Module):
+            def __init__(self, named_params):
+                super().__init__()
+                for name, param in named_params:
+                    # Replace dots with underscores for setattr compatibility
+                    safe_name = name.replace('.', '_').replace('[', '_').replace(']', '_')
+                    self.register_parameter(safe_name, param)
+                # Store original names for lookup
+                self._original_names = {safe_name: name for name, _ in named_params}
+                
+            def named_parameters(self, **kwargs):
+                # Return with original names
+                for safe_name, param in super().named_parameters(**kwargs):
+                    original_name = self._original_names.get(safe_name, safe_name)
+                    yield original_name, param
+        
+        stage_named_params = [(n, p) for n, p in student_model.named_parameters() if n in stage_param_names]
+        temp_model = TempModel(stage_named_params)
+        
+        # Use construct_optimizer to properly create optimizer with schedulers
+        optimizer_wrapper = construct_optimizer(
+            temp_model,
+            optimizer_conf,
+            stage_options,  # Use stage-specific scheduler config
+            validate_param_groups=False  # Skip validation since we're using a temp model
+        )
+        
+        # Override zero_grad to use the full model
+        original_zero_grad = optimizer_wrapper.zero_grad
+        optimizer_wrapper.zero_grad = lambda **kwargs: student_model.zero_grad(**kwargs)
+        
+        # Set single main optimizer (trainer handles s_optimizer separately)
+        student_trainer.optims = [optimizer_wrapper]
+
         
         # 7. Load checkpoint for 'resume' action AFTER optimizer is reconstructed (so param groups match)
         # Skip scheduler loading since each stage creates its own fresh scheduler
         if args.init_from and args.action == 'resume':
             load_ckp_vggt(args, student_trainer, load_scheduler=False)
-            
-        logger.info(f"==> Validating stage {stage['name']} validation before training")
-        student_trainer.run_val()
-        student_trainer.model.module.eval()
-        run_evaluation_vggt(student_trainer.model.module)
+            logger.info(f"==> Validating stage {stage['name']} validation before training")
+            student_trainer.run_val()
+            student_trainer.model.module.eval()
+            run_evaluation_vggt(student_trainer.model.module)
         student_trainer.model.module.train()
         
         # 8. Train for this stage's epochs using Trainer.run_train()
@@ -587,31 +689,23 @@ def get_config():
         #     "beta": 0.0
         # },
         {
-            "name": "blocks_12_17",
+            "name": "blocks_all",
             "layers": [
-                "aggregator.frame_blocks.12", "aggregator.frame_blocks.13", 
-                "aggregator.frame_blocks.14", "aggregator.frame_blocks.15",
-                "aggregator.frame_blocks.16", "aggregator.frame_blocks.17",
-                "aggregator.global_blocks.12", "aggregator.global_blocks.13",
-                "aggregator.global_blocks.14", "aggregator.global_blocks.15",
-                "aggregator.global_blocks.16", "aggregator.global_blocks.17"
+                f"aggregator.frame_blocks.{i}" for i in range(0, 24)
+            ] + [
+                f"aggregator.global_blocks.{i}" for i in range(0, 24)
             ],
             "hook_points": [
-                "aggregator.frame_blocks[12]",
-                "aggregator.global_blocks[12]",
-                "aggregator.frame_blocks[13]",
-                "aggregator.global_blocks[13]",
-                "aggregator.frame_blocks[14]",
-                "aggregator.global_blocks[14]",
-                "aggregator.frame_blocks[15]",
-                "aggregator.global_blocks[15]",
-                "aggregator.frame_blocks[16]",
-                "aggregator.global_blocks[16]",
-                "aggregator.frame_blocks[17]",
-                "aggregator.global_blocks[17]"
+                "aggregator.global_blocks.23"
             ],
             "epochs": 50,
-            "lr": 1e-4,
+            "scale_lr": 1.1e-5, # 1.1e-7,  # Learning rate for quantization scales
+            # Scheduler config for weight optimizer
+            "warmup_start_value": 1e-7,
+            "warmup_end_value": 1e-4,
+            "cosine_start_value": 1e-4,
+            "cosine_end_value": 1e-5,
+            "scheduler_lengths": [0.10, 0.90],  # [warmup_fraction, cosine_fraction]
             "alpha": 1.0,
             "beta": 0.0
         },
@@ -640,7 +734,13 @@ def get_config():
                 "aggregator.global_blocks[17]"
             ],
             "epochs": 30,
-            "lr": 1e-3,
+            "scale_lr": 1e-2,  # Learning rate for quantization scales
+            # Scheduler config for weight optimizer
+            "warmup_start_value": 1e-6,
+            "warmup_end_value": 1e-3,
+            "cosine_start_value": 1e-3,
+            "cosine_end_value": 1e-6,
+            "scheduler_lengths": [0.05, 0.95],
             "alpha": 0.0,
             "beta": 1.0
         },
@@ -659,7 +759,13 @@ def get_config():
                 "aggregator.global_blocks[23]"
             ],
             "epochs": 10,
-            "lr": 1e-5,
+            "scale_lr": 1e-4,  # Learning rate for quantization scales
+            # Scheduler config for weight optimizer
+            "warmup_start_value": 1e-6,
+            "warmup_end_value": 1e-5,
+            "cosine_start_value": 1e-5,
+            "cosine_end_value": 1e-6,
+            "scheduler_lengths": [0.05, 0.95],
             "alpha": 1.0,
             "beta": 0.0
         },
@@ -678,7 +784,13 @@ def get_config():
                 "aggregator.global_blocks[23]"
             ],
             "epochs": 10,
-            "lr": 1e-5,
+            "scale_lr": 1e-4,  # Learning rate for quantization scales
+            # Scheduler config for weight optimizer
+            "warmup_start_value": 1e-6,
+            "warmup_end_value": 1e-5,
+            "cosine_start_value": 1e-5,
+            "cosine_end_value": 1e-6,
+            "scheduler_lengths": [0.05, 0.95],
             "alpha": 0.0,
             "beta": 1.0
         },
@@ -700,7 +812,13 @@ def get_config():
             "layers": ["depth_head"],
             "hook_points": ["depth_head"],
             "epochs": 10,
-            "lr": 1e-5,
+            "scale_lr": 1e-4,  # Learning rate for quantization scales
+            # Scheduler config for weight optimizer
+            "warmup_start_value": 1e-6,
+            "warmup_end_value": 1e-5,
+            "cosine_start_value": 1e-5,
+            "cosine_end_value": 1e-6,
+            "scheduler_lengths": [0.05, 0.95],
             "alpha": 0.7,
             "beta": 0.3
         },
@@ -709,7 +827,13 @@ def get_config():
             "layers": ["camera_head"],
             "hook_points": ["camera_head"],
             "epochs": 10,
-            "lr": 1e-5,
+            "scale_lr": 1e-4,  # Learning rate for quantization scales
+            # Scheduler config for weight optimizer
+            "warmup_start_value": 1e-6,
+            "warmup_end_value": 1e-5,
+            "cosine_start_value": 1e-5,
+            "cosine_end_value": 1e-6,
+            "scheduler_lengths": [0.05, 0.95],
             "alpha": 0.7,
             "beta": 0.3
         }

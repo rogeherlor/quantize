@@ -828,6 +828,251 @@ def analyze_quantization_difficulty(stats_collector, save_dir, prefix="", layer_
     logger.info(f"Quantization difficulty analysis saved to {report_path}")
     return difficulties
 
+def compute_per_dimension_stats(data, axis):
+    """
+    Compute statistics along a specific dimension.
+    
+    Args:
+        data: numpy array
+        axis: dimension along which to compute stats (other dimensions are aggregated)
+    
+    Returns:
+        dict with arrays of stats for each index along the specified dimension
+    """
+    # Stats along the specified axis (computed over all other dimensions)
+    mean = np.mean(data, axis=tuple([i for i in range(data.ndim) if i != axis]))
+    std = np.std(data, axis=tuple([i for i in range(data.ndim) if i != axis]))
+    min_val = np.min(data, axis=tuple([i for i in range(data.ndim) if i != axis]))
+    max_val = np.max(data, axis=tuple([i for i in range(data.ndim) if i != axis]))
+    median = np.median(data, axis=tuple([i for i in range(data.ndim) if i != axis]))
+    
+    # Compute percentiles
+    p5 = np.percentile(data, 5, axis=tuple([i for i in range(data.ndim) if i != axis]))
+    p25 = np.percentile(data, 25, axis=tuple([i for i in range(data.ndim) if i != axis]))
+    p75 = np.percentile(data, 75, axis=tuple([i for i in range(data.ndim) if i != axis]))
+    p95 = np.percentile(data, 95, axis=tuple([i for i in range(data.ndim) if i != axis]))
+    
+    return {
+        'mean': mean,
+        'std': std,
+        'min': min_val,
+        'max': max_val,
+        'median': median,
+        'p5': p5,
+        'p25': p25,
+        'p75': p75,
+        'p95': p95,
+        'range': max_val - min_val,
+        'iqr': p75 - p25,  # Interquartile range
+    }
+
+def plot_single_layer_dimension_stats(stats, layer_name, dim_label):
+    """
+    Create a visualization of per-dimension statistics for a single layer.
+    
+    Args:
+        stats: dict of stat arrays (mean, std, min, max, etc.)
+        layer_name: name of the layer
+        dim_label: label for the dimension (e.g., "Token Dim", "d_in", "d_out")
+    
+    Returns:
+        matplotlib figure
+    """
+    # Metrics to visualize
+    metrics = ['mean', 'std', 'min', 'max', 'median', 'p5', 'p25', 'p75', 'p95']
+    
+    n_dims = len(stats.get('mean', []))
+    if n_dims == 0:
+        return None
+    
+    # Create figure with subplots for each metric
+    n_rows = 3
+    n_cols = 3
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, 10))
+    axes = axes.flatten()
+    
+    dim_indices = np.arange(n_dims)
+    
+    for idx, metric in enumerate(metrics):
+        ax = axes[idx]
+        data = stats.get(metric, np.array([]))
+        
+        if len(data) == 0:
+            ax.text(0.5, 0.5, f'No data', ha='center', va='center')
+            ax.set_title(f'{metric.upper()}')
+            continue
+        
+        # Plot as line with markers
+        ax.plot(dim_indices, data, marker='o', markersize=3, linewidth=1, alpha=0.7)
+        ax.fill_between(dim_indices, data, alpha=0.3)
+        
+        # Highlight outliers if this is min/max
+        if metric == 'max':
+            # Find dimensions with unusually high values
+            median_val = np.median(data)
+            std_val = np.std(data)
+            outlier_threshold = median_val + 2 * std_val
+            outliers = data > outlier_threshold
+            if np.any(outliers):
+                ax.scatter(dim_indices[outliers], data[outliers], color='red', s=50, zorder=5, label='Outliers')
+        elif metric == 'min':
+            median_val = np.median(data)
+            std_val = np.std(data)
+            outlier_threshold = median_val - 2 * std_val
+            outliers = data < outlier_threshold
+            if np.any(outliers):
+                ax.scatter(dim_indices[outliers], data[outliers], color='red', s=50, zorder=5, label='Outliers')
+        
+        ax.set_xlabel('Dimension Index', fontsize=9)
+        ax.set_ylabel('Value', fontsize=9)
+        ax.set_title(f'{metric.upper()}', fontsize=10, fontweight='bold')
+        ax.grid(True, alpha=0.3, linestyle='--')
+        ax.tick_params(labelsize=8)
+        
+        if 'label' in ax.get_legend_handles_labels()[1]:
+            ax.legend(fontsize=8)
+    
+    # Add overall statistics in the remaining subplots
+    if len(metrics) < len(axes):
+        # Additional subplot: Range and IQR
+        ax_extra = axes[len(metrics)]
+        range_data = stats.get('range', np.array([]))
+        iqr_data = stats.get('iqr', np.array([]))
+        
+        if len(range_data) > 0:
+            ax_extra.plot(dim_indices, range_data, marker='s', markersize=3, linewidth=1, 
+                         alpha=0.7, label='Range', color='blue')
+            if len(iqr_data) > 0:
+                ax_extra.plot(dim_indices, iqr_data, marker='^', markersize=3, linewidth=1, 
+                             alpha=0.7, label='IQR', color='orange')
+            ax_extra.set_xlabel('Dimension Index', fontsize=9)
+            ax_extra.set_ylabel('Value', fontsize=9)
+            ax_extra.set_title('RANGE & IQR', fontsize=10, fontweight='bold')
+            ax_extra.grid(True, alpha=0.3, linestyle='--')
+            ax_extra.legend(fontsize=8)
+            ax_extra.tick_params(labelsize=8)
+    
+    fig.suptitle(f'{layer_name}\n{dim_label} Statistics', fontsize=12, fontweight='bold')
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    
+    return fig
+
+def analyze_per_dimension_statistics(stats_collector, writer, step, prefix="", layer_filter=None):
+    """
+    Analyze and visualize per-dimension statistics for activations and weights.
+    Logs to TensorBoard with 2 images per layer:
+    - Activations: token_dim and d_in (feature dimension)
+    - Weights: d_in and d_out
+    
+    Args:
+        stats_collector: StatsCollector instance
+        writer: TensorBoard SummaryWriter
+        step: training step for logging
+        prefix: prefix for the model type (e.g., "original", "quantized")
+        layer_filter: optional layer filter
+    """
+    logger.info(f"Analyzing per-dimension statistics for {prefix}...")
+    
+    snapshots = getattr(stats_collector, 'snapshots', {})
+    snapshots = filter_snapshots_by_layers(snapshots, layer_filter)
+    
+    # Separate activations and weights
+    activation_snapshots = {k: v for k, v in snapshots.items() if '.activation_out' in k}
+    weight_snapshots = {k: v for k, v in snapshots.items() if '.weight' in k}
+    
+    logger.info(f"Found {len(activation_snapshots)} activation snapshots and {len(weight_snapshots)} weight snapshots")
+    
+    # ========== ACTIVATIONS ==========
+    logger.info("Processing activation statistics...")
+    
+    for key, data in activation_snapshots.items():
+        layer_name = key.replace('.activation_out', '')
+        
+        # Handle different tensor shapes
+        if data.ndim < 2:
+            continue
+        
+        # Reshape to [*, features]
+        if data.ndim == 2:
+            reshaped = data  # [seq, features]
+        elif data.ndim == 3:
+            if data.shape[0] == 1:
+                reshaped = data[0]  # Remove batch dim: [seq, features]
+            else:
+                reshaped = data.reshape(-1, data.shape[-1])  # [batch*seq, features]
+        elif data.ndim == 4:
+            # For [batch, channels, H, W], reshape to [batch*H*W, channels]
+            reshaped = data.transpose(0, 2, 3, 1).reshape(-1, data.shape[1])
+        else:
+            continue
+        
+        if reshaped.shape[0] < 2 or reshaped.shape[1] < 2:
+            continue
+        
+        # 1. Token/Sequence dimension stats (stats for each position in sequence)
+        if reshaped.shape[0] > 1:
+            token_stats = compute_per_dimension_stats(reshaped, axis=0)
+            fig = plot_single_layer_dimension_stats(token_stats, layer_name, "Token/Sequence Dimension")
+            if fig is not None:
+                tag = f"{prefix}/per_dim_stats/{layer_name}/activation_token_dim"
+                writer.add_figure(tag, fig, step)
+                plt.close(fig)
+                logger.debug(f"Logged token dimension stats for {layer_name}")
+        
+        # 2. Feature/Embedding dimension stats (stats for each channel/feature)
+        if reshaped.shape[1] > 1:
+            feature_stats = compute_per_dimension_stats(reshaped, axis=1)
+            fig = plot_single_layer_dimension_stats(feature_stats, layer_name, "Feature/Embedding Dimension (d_in)")
+            if fig is not None:
+                tag = f"{prefix}/per_dim_stats/{layer_name}/activation_d_in"
+                writer.add_figure(tag, fig, step)
+                plt.close(fig)
+                logger.debug(f"Logged feature dimension stats for {layer_name}")
+    
+    # ========== WEIGHTS ==========
+    logger.info("Processing weight statistics...")
+    
+    for key, data in weight_snapshots.items():
+        layer_name = key.replace('.weight', '')
+        
+        if data.ndim < 2:
+            continue
+        
+        # Reshape to [d_out, d_in] format
+        if data.ndim == 2:
+            reshaped = data  # [d_out, d_in]
+        elif data.ndim == 4:
+            # Reshape [d_out, d_in, H, W] to [d_out, d_in*H*W]
+            reshaped = data.reshape(data.shape[0], -1)
+        else:
+            continue
+        
+        if reshaped.shape[0] < 2 or reshaped.shape[1] < 2:
+            continue
+        
+        # 1. d_in dimension stats (stats for each input channel/feature)
+        if reshaped.shape[1] > 1:
+            d_in_stats = compute_per_dimension_stats(reshaped, axis=1)
+            fig = plot_single_layer_dimension_stats(d_in_stats, layer_name, "Input Dimension (d_in)")
+            if fig is not None:
+                tag = f"{prefix}/per_dim_stats/{layer_name}/weight_d_in"
+                writer.add_figure(tag, fig, step)
+                plt.close(fig)
+                logger.debug(f"Logged d_in stats for {layer_name}")
+        
+        # 2. d_out dimension stats (stats for each output channel/feature)
+        if reshaped.shape[0] > 1:
+            d_out_stats = compute_per_dimension_stats(reshaped, axis=0)
+            fig = plot_single_layer_dimension_stats(d_out_stats, layer_name, "Output Dimension (d_out)")
+            if fig is not None:
+                tag = f"{prefix}/per_dim_stats/{layer_name}/weight_d_out"
+                writer.add_figure(tag, fig, step)
+                plt.close(fig)
+                logger.debug(f"Logged d_out stats for {layer_name}")
+    
+    writer.flush()
+    logger.info(f"Completed per-dimension statistics analysis for {prefix}")
+
 def run_stats(args):
     """Main stats collection function"""
     MODULE_TYPES = ['Conv2d', 'Linear', 'QConv2d', 'QLinear', 'LSQ_quantizer', 'ReLU', 'MinMax_quantizer']
@@ -914,6 +1159,10 @@ def run_stats(args):
     logger.info("Analyzing quantization difficulty for original model...")
     analyze_quantization_difficulty(original_stats, save_path, prefix="original", layer_filter=original_layer_filter)
     
+    # Analyze per-dimension statistics for original model
+    logger.info("Analyzing per-dimension statistics for original model...")
+    analyze_per_dimension_statistics(original_stats, writer, step=0, prefix="original", layer_filter=original_layer_filter)
+    
     disk_usage = shutil.disk_usage(args.save_path)
     free_gb = disk_usage.free / (1024**3)
     logger.info(f"Disk space available: {free_gb:.2f} GB")
@@ -961,6 +1210,10 @@ def run_stats(args):
     # Analyze quantization difficulty for quantized model
     logger.info("Analyzing quantization difficulty for quantized model...")
     analyze_quantization_difficulty(quantized_stats, save_path, prefix="quantized", layer_filter=quantized_layer_filter)
+    
+    # Analyze per-dimension statistics for quantized model
+    logger.info("Analyzing per-dimension statistics for quantized model...")
+    analyze_per_dimension_statistics(quantized_stats, writer, step=0, prefix="quantized", layer_filter=quantized_layer_filter)
     
     logger.info("=" * 50)
     logger.info("CREATING COMPARISON HISTOGRAMS")

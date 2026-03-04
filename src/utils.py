@@ -303,13 +303,13 @@ def split_params(model, weight_decay, lr, x_lr, w_lr, x_wd, w_wd):
         if not param.requires_grad:
             continue  # frozen weights
         added = False
-        for skip_key in ['x_scale', 'x_threshold', 'x_theta', 'x_bitscale']:
+        for skip_key in ['x_scale', 'x_offset', 'x_threshold', 'x_theta', 'x_bitscale']:
             if skip_key in name:
                 # print ("Skip weight decay & x_lr for: ", name)
                 no_decay_x.append(param)
                 added = True
                 break
-        for skip_key in ['w_scale','w_zero_scale', 'w_shift_scale', 'w_threshold', 'w_theta', 'w_bitscale']:
+        for skip_key in ['w_scale', 'w_offset', 'w_zero_scale', 'w_shift_scale', 'w_threshold', 'w_theta', 'w_bitscale']:
             if skip_key in name:
                 # print ("Skip weight decay & w_lr for: ", name)
                 no_decay_w.append(param)

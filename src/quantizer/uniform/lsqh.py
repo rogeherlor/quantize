@@ -3,12 +3,17 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 
+# Import QuaRot's Hadamard matrix generation
+from src.ptq.quarot.quarot_utils import random_hadamard_matrix
+
 #----------------------------------------------------------
-# LSQ
+# LSQ with Hadamard Rotation Support
 #----------------------------------------------------------
 class LSQ_quantizer(nn.Module):
-    def __init__(self, module, num_bits, mode, **kwargs):
+    def __init__(self, module, num_bits, mode, use_hadamard=True, **kwargs):
         super(LSQ_quantizer, self).__init__()
+        self.use_hadamard = use_hadamard
+        self.mode = mode
         self.params_set(module, num_bits, mode)
 
     def params_set(self, module, num_bits, mode):
@@ -24,21 +29,46 @@ class LSQ_quantizer(nn.Module):
                 module.x_Qp = 2 ** (num_bits-1) - 1
             module.x_scale = nn.Parameter(torch.tensor([0.0], dtype=torch.float32)) # Cast at use
             module.x_Qparms['scale'] = module.x_scale
+                
         elif mode == "weight":
             num_bits = 4
             module.w_Qn = 2 ** (num_bits-1)
             module.w_Qp = 2 ** (num_bits-1) - 1
             module.w_scale = nn.Parameter(torch.tensor([0.0], dtype=torch.float32)) # Cast at use
             module.w_Qparms['scale'] = module.w_scale
+        
+        # Initialize rotation matrix storage - will be created lazily on first use
+        self.rotation_matrix = None
 
-    def forward(self, x, Qparms, Qn, Qp, num_elements, grad_scale_mode):
+    def forward(self, x, Qparms, Qn, Qp, num_elements, grad_scale_mode, rotation_matrix=None):
         scale = Qparms['scale']
-        yq = _LSQ_quantizer(x, scale, Qn, Qp, num_elements, grad_scale_mode)
-        y = yq * scale
-        return y
+        
+        # Apply Hadamard rotation if enabled
+        if self.use_hadamard:
+            # Initialize rotation matrix once on first forward pass
+            if self.rotation_matrix is None:
+                feature_dim = x.shape[-1]
+                # Use QuaRot's pre-computed structured Hadamard matrix
+                self.rotation_matrix = random_hadamard_matrix(feature_dim, x.device).to(x.dtype)
+            
+            # Apply rotation: x_rotated = x @ rotation_matrix
+            x_rotated = torch.matmul(x, self.rotation_matrix)
+            yq = _LSQ_quantizer(x_rotated, scale, Qn, Qp, num_elements, grad_scale_mode)
+            y = yq * scale
+            # Apply inverse rotation: y_unrotated = y @ rotation_matrix.T
+            y_unrotated = torch.matmul(y, self.rotation_matrix.T)
+            return y_unrotated
+        else:
+            yq = _LSQ_quantizer(x, scale, Qn, Qp, num_elements, grad_scale_mode)
+            y = yq * scale
+            return y
 
     def scale_to_Qparms(self, Qparms, Qn, Qp):
         Qparms["scale"].data = torch.full(Qparms["scale"].size(), Qparms["init_scale"].clone().detach(), device=Qparms["scale"].device)
+
+#----------------------------------------------------------
+# Original LSQ quantizer function
+#----------------------------------------------------------
 
 def _LSQ_quantizer(x, scale, Qn, Qp, num_elements, grad_scale_mode):
 

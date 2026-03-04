@@ -152,7 +152,9 @@ def _forward_common(module, input):
                     module.x_quantizer.base_dim = 1
                     scale_shape = [1, 1]
                 module.x_scale = nn.Parameter(torch.zeros(scale_shape, dtype=torch.float32, device=input.device))
+                module.x_offset = nn.Parameter(torch.zeros(scale_shape, dtype=torch.float32, device=input.device))
                 module.x_Qparms['scale'] = module.x_scale
+                module.x_Qparms['offset'] = module.x_offset
                 module.x_quantizer.scale_shape = tuple(scale_shape)
             
             if module.first_layer:                
