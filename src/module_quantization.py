@@ -7,6 +7,7 @@ import math
 from src.quantizer.uniform import *
 from src.quantizer.nonuniform import *
 from src.initializer import *
+from src.ptq.quarot.quarot_utils import random_hadamard_matrix
 
 from torch.utils.checkpoint import checkpoint
 
@@ -19,7 +20,8 @@ class QLinear(nn.Linear):
         num_bits=None, w_grad_scale_mode = "LSQ_grad_scale", \
         x_grad_scale_mode = "LSQ_grad_scale",\
         weight_norm = False, w_quantizer = None, x_quantizer = None, \
-        w_initializer = None, x_initializer = None, first_layer = False):
+        w_initializer = None, x_initializer = None, first_layer = False, \
+        use_hadamard = False):
 
         super().__init__(in_features=in_features, out_features=out_features, bias=bias)
 
@@ -28,6 +30,8 @@ class QLinear(nn.Linear):
         self.w_grad_scale_mode = w_grad_scale_mode
         self.weight_norm = weight_norm
         self.first_layer = first_layer
+        self.use_hadamard = use_hadamard
+        self._hadamard_matrix = None  # Lazily initialized, shared for weight and activation
         self.x_Qparms={}
         self.w_Qparms={}
 
@@ -167,6 +171,22 @@ def _forward_common(module, input):
             Qparms_to_dev(weight, module.w_Qparms)
             module.w_initializer(weight, module.w_Qparms, module.w_Qn, module.w_Qp, module.w_quantizer, "symmetric")            
             module.w_quantizer.scale_to_Qparms(module.w_Qparms, module.w_Qn, module.w_Qp)
+
+    # Apply Hadamard rotation to both input and weight before quantization.
+    # Using the same matrix H for both ensures the rotations cancel in the linear
+    # product: (x @ H) @ (W @ H)^T = x @ H @ H^T @ W^T = x @ W^T.
+    # This distributes outliers and makes both tensors smoother for LSQ training.
+    if getattr(module, 'use_hadamard', False):
+        feature_dim = input.shape[-1]
+        H = module._hadamard_matrix
+        if H is None or H.shape[0] != feature_dim:
+            H = random_hadamard_matrix(feature_dim, input.device).to(input.dtype)
+            module._hadamard_matrix = H
+        elif H.device != input.device or H.dtype != input.dtype:
+            H = H.to(device=input.device, dtype=input.dtype)
+            module._hadamard_matrix = H
+        input = torch.matmul(input, H)
+        weight = torch.matmul(weight, H)
 
     if module.x_quantizer != None:
         x_numel = input.numel()
