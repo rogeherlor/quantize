@@ -229,16 +229,19 @@ class LSQC_quantizer(nn.Module):
                 rest_patch_expanded_o = rest_patch_o.repeat(1, num_patches_current, 1)
                 rest_pattern_o = torch.cat([rest_special_o, rest_patch_expanded_o], dim=1)  # [1, P, 1]
                 
-                # Create tensors with alternating pattern: [frame0, frame1+, ..., frame1+] repeated B times
+                # Build scale/offset tensors with frame0 params at positions 0, S, 2S, ...
+                # Use torch.where (no in-place ops) so autograd stays intact.
                 batch_size_total = x.shape[0]  # B*S
-                scale = rest_pattern_s.repeat(batch_size_total, 1, 1)  # [B*S, P, 1] - all rest by default
-                offset = rest_pattern_o.repeat(batch_size_total, 1, 1)  # [B*S, P, 1]
-                
-                # Override every S-th position (0, S, 2S, ...) with frame0 params
-                for batch_idx in range(B):
-                    frame0_pos = batch_idx * num_frames  # Position of frame 0 for this batch
-                    scale[frame0_pos:frame0_pos+1, :, :] = frame1_pattern_s
-                    offset[frame0_pos:frame0_pos+1, :, :] = frame1_pattern_o
+                positions = torch.arange(batch_size_total, device=x.device)
+                is_frame0 = (positions % num_frames == 0).view(batch_size_total, 1, 1)  # [B*S, 1, 1]
+
+                frame1_full_s = frame1_pattern_s.expand(batch_size_total, -1, -1)  # [B*S, P, 1]
+                rest_full_s   = rest_pattern_s.expand(batch_size_total, -1, -1)
+                scale  = torch.where(is_frame0, frame1_full_s, rest_full_s)
+
+                frame1_full_o = frame1_pattern_o.expand(batch_size_total, -1, -1)
+                rest_full_o   = rest_pattern_o.expand(batch_size_total, -1, -1)
+                offset = torch.where(is_frame0, frame1_full_o, rest_full_o)
                 
                 # Debug: verify correct assignment
                 # print(f"  Frame attention - B={B}, S={num_frames}, total_batch={batch_size_total}")

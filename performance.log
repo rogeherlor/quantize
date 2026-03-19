@@ -1,0 +1,349 @@
+2026-01-31 00:36:11,774 - performance_logger - INFO - Loading checkpoint from data3/rogelio/logs_distill_2/exp001/ckpts/checkpoint_12-17_35.pt
+2026-01-31 00:36:14,155 - performance_logger - INFO - Model loaded. Missing keys: 144, Unexpected keys: 144
+2026-01-31 00:36:14,155 - performance_logger - INFO - Packing model to REAL integer weights...
+2026-01-31 00:36:14,162 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,216 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,218 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,221 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,221 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,224 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,225 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,229 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,234 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,236 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,237 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,238 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,239 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,242 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,243 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,244 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,248 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,249 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,251 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,252 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,252 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,253 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,257 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,257 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,260 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,261 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,263 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,264 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,264 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,265 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,265 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,269 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,270 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,270 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,271 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,273 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,275 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,276 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,277 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,277 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,278 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,279 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,281 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,281 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,282 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,283 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,285 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,289 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 00:36:14,291 - performance_logger - INFO - Replaced aggregator.frame_blocks.6.attn.qkv with Real Int Packed4 Layer
+2026-01-31 00:36:14,291 - performance_logger - INFO - Replaced aggregator.frame_blocks.6.attn.proj with Real Int Packed4 Layer
+2026-01-31 00:36:14,291 - performance_logger - INFO - Replaced aggregator.frame_blocks.6.mlp.fc1 with Real Int Packed4 Layer
+2026-01-31 00:36:14,291 - performance_logger - INFO - Replaced aggregator.frame_blocks.6.mlp.fc2 with Real Int Packed4 Layer
+2026-01-31 00:36:14,291 - performance_logger - INFO - Replaced aggregator.frame_blocks.7.attn.qkv with Real Int Packed4 Layer
+2026-01-31 00:36:14,292 - performance_logger - INFO - Replaced aggregator.frame_blocks.7.attn.proj with Real Int Packed4 Layer
+2026-01-31 00:36:14,292 - performance_logger - INFO - Replaced aggregator.frame_blocks.7.mlp.fc1 with Real Int Packed4 Layer
+2026-01-31 00:36:14,292 - performance_logger - INFO - Replaced aggregator.frame_blocks.7.mlp.fc2 with Real Int Packed4 Layer
+2026-01-31 00:36:14,292 - performance_logger - INFO - Replaced aggregator.frame_blocks.8.attn.qkv with Real Int Packed4 Layer
+2026-01-31 00:36:14,292 - performance_logger - INFO - Replaced aggregator.frame_blocks.8.attn.proj with Real Int Packed4 Layer
+2026-01-31 00:36:14,292 - performance_logger - INFO - Replaced aggregator.frame_blocks.8.mlp.fc1 with Real Int Packed4 Layer
+2026-01-31 00:36:14,292 - performance_logger - INFO - Replaced aggregator.frame_blocks.8.mlp.fc2 with Real Int Packed4 Layer
+2026-01-31 00:36:14,292 - performance_logger - INFO - Replaced aggregator.frame_blocks.9.attn.qkv with Real Int Packed4 Layer
+2026-01-31 00:36:14,292 - performance_logger - INFO - Replaced aggregator.frame_blocks.9.attn.proj with Real Int Packed4 Layer
+2026-01-31 00:36:14,292 - performance_logger - INFO - Replaced aggregator.frame_blocks.9.mlp.fc1 with Real Int Packed4 Layer
+2026-01-31 00:36:14,293 - performance_logger - INFO - Replaced aggregator.frame_blocks.9.mlp.fc2 with Real Int Packed4 Layer
+2026-01-31 00:36:14,293 - performance_logger - INFO - Replaced aggregator.frame_blocks.10.attn.qkv with Real Int Packed4 Layer
+2026-01-31 00:36:14,293 - performance_logger - INFO - Replaced aggregator.frame_blocks.10.attn.proj with Real Int Packed4 Layer
+2026-01-31 00:36:14,293 - performance_logger - INFO - Replaced aggregator.frame_blocks.10.mlp.fc1 with Real Int Packed4 Layer
+2026-01-31 00:36:14,293 - performance_logger - INFO - Replaced aggregator.frame_blocks.10.mlp.fc2 with Real Int Packed4 Layer
+2026-01-31 00:36:14,293 - performance_logger - INFO - Replaced aggregator.frame_blocks.11.attn.qkv with Real Int Packed4 Layer
+2026-01-31 00:36:14,293 - performance_logger - INFO - Replaced aggregator.frame_blocks.11.attn.proj with Real Int Packed4 Layer
+2026-01-31 00:36:14,293 - performance_logger - INFO - Replaced aggregator.frame_blocks.11.mlp.fc1 with Real Int Packed4 Layer
+2026-01-31 00:36:14,293 - performance_logger - INFO - Replaced aggregator.frame_blocks.11.mlp.fc2 with Real Int Packed4 Layer
+2026-01-31 00:36:14,293 - performance_logger - INFO - Replaced aggregator.global_blocks.6.attn.qkv with Real Int Packed4 Layer
+2026-01-31 00:36:14,293 - performance_logger - INFO - Replaced aggregator.global_blocks.6.attn.proj with Real Int Packed4 Layer
+2026-01-31 00:36:14,293 - performance_logger - INFO - Replaced aggregator.global_blocks.6.mlp.fc1 with Real Int Packed4 Layer
+2026-01-31 00:36:14,293 - performance_logger - INFO - Replaced aggregator.global_blocks.6.mlp.fc2 with Real Int Packed4 Layer
+2026-01-31 00:36:14,293 - performance_logger - INFO - Replaced aggregator.global_blocks.7.attn.qkv with Real Int Packed4 Layer
+2026-01-31 00:36:14,294 - performance_logger - INFO - Replaced aggregator.global_blocks.7.attn.proj with Real Int Packed4 Layer
+2026-01-31 00:36:14,294 - performance_logger - INFO - Replaced aggregator.global_blocks.7.mlp.fc1 with Real Int Packed4 Layer
+2026-01-31 00:36:14,294 - performance_logger - INFO - Replaced aggregator.global_blocks.7.mlp.fc2 with Real Int Packed4 Layer
+2026-01-31 00:36:14,294 - performance_logger - INFO - Replaced aggregator.global_blocks.8.attn.qkv with Real Int Packed4 Layer
+2026-01-31 00:36:14,294 - performance_logger - INFO - Replaced aggregator.global_blocks.8.attn.proj with Real Int Packed4 Layer
+2026-01-31 00:36:14,294 - performance_logger - INFO - Replaced aggregator.global_blocks.8.mlp.fc1 with Real Int Packed4 Layer
+2026-01-31 00:36:14,294 - performance_logger - INFO - Replaced aggregator.global_blocks.8.mlp.fc2 with Real Int Packed4 Layer
+2026-01-31 00:36:14,294 - performance_logger - INFO - Replaced aggregator.global_blocks.9.attn.qkv with Real Int Packed4 Layer
+2026-01-31 00:36:14,294 - performance_logger - INFO - Replaced aggregator.global_blocks.9.attn.proj with Real Int Packed4 Layer
+2026-01-31 00:36:14,294 - performance_logger - INFO - Replaced aggregator.global_blocks.9.mlp.fc1 with Real Int Packed4 Layer
+2026-01-31 00:36:14,294 - performance_logger - INFO - Replaced aggregator.global_blocks.9.mlp.fc2 with Real Int Packed4 Layer
+2026-01-31 00:36:14,294 - performance_logger - INFO - Replaced aggregator.global_blocks.10.attn.qkv with Real Int Packed4 Layer
+2026-01-31 00:36:14,294 - performance_logger - INFO - Replaced aggregator.global_blocks.10.attn.proj with Real Int Packed4 Layer
+2026-01-31 00:36:14,294 - performance_logger - INFO - Replaced aggregator.global_blocks.10.mlp.fc1 with Real Int Packed4 Layer
+2026-01-31 00:36:14,294 - performance_logger - INFO - Replaced aggregator.global_blocks.10.mlp.fc2 with Real Int Packed4 Layer
+2026-01-31 00:36:14,294 - performance_logger - INFO - Replaced aggregator.global_blocks.11.attn.qkv with Real Int Packed4 Layer
+2026-01-31 00:36:14,295 - performance_logger - INFO - Replaced aggregator.global_blocks.11.attn.proj with Real Int Packed4 Layer
+2026-01-31 00:36:14,295 - performance_logger - INFO - Replaced aggregator.global_blocks.11.mlp.fc1 with Real Int Packed4 Layer
+2026-01-31 00:36:14,295 - performance_logger - INFO - Replaced aggregator.global_blocks.11.mlp.fc2 with Real Int Packed4 Layer
+2026-01-31 00:36:14,295 - performance_logger - INFO - ======================================================================
+2026-01-31 00:36:14,295 - performance_logger - INFO - PROFILING CONFIGURATION
+2026-01-31 00:36:14,295 - performance_logger - INFO - ======================================================================
+2026-01-31 00:36:14,295 - performance_logger - INFO - NVTX markers enabled for nsys profiling
+2026-01-31 00:36:14,295 - performance_logger - INFO - Recommended nsys command:
+2026-01-31 00:36:14,295 - performance_logger - INFO -   nsys profile -o quantize_profile \
+2026-01-31 00:36:14,295 - performance_logger - INFO -     --capture-range=cudaProfilerApi \
+2026-01-31 00:36:14,295 - performance_logger - INFO -     --cuda-graph-trace=node \
+2026-01-31 00:36:14,295 - performance_logger - INFO -     python main.py --mode realquant ...
+2026-01-31 00:36:14,295 - performance_logger - INFO - ======================================================================
+
+2026-01-31 00:36:14,295 - performance_logger - INFO - ======================================================================
+2026-01-31 00:36:14,295 - performance_logger - INFO - WARMUP PHASE: Running 3 inference passes to initialize JIT/CUDA kernels
+2026-01-31 00:36:14,295 - performance_logger - INFO - This is SEPARATE from Timer's measurement - ensures stable baseline before benchmarking
+2026-01-31 00:36:14,295 - performance_logger - INFO - ======================================================================
+2026-01-31 00:37:02,355 - performance_logger - INFO - Warming up Real Quantized model (W8/W4 INT kernels)...
+2026-01-31 00:37:20,533 - performance_logger - INFO -   ✓ Real Quantized warmup complete (3 iterations)
+
+2026-01-31 00:37:20,533 - performance_logger - INFO - Warming up Fake Quantized model (FP32 simulation)...
+2026-01-31 00:37:38,705 - performance_logger - INFO -   ✓ Fake Quantized warmup complete (3 iterations)
+
+2026-01-31 00:37:38,705 - performance_logger - INFO - Warming up Original FP32 model...
+2026-01-31 00:37:57,187 - performance_logger - INFO -   ✓ Original model warmup complete (3 iterations)
+
+2026-01-31 00:37:57,187 - performance_logger - INFO - ======================================================================
+2026-01-31 00:37:57,187 - performance_logger - INFO - BENCHMARKING PHASE: Measuring actual performance
+2026-01-31 00:37:57,187 - performance_logger - INFO - ======================================================================
+2026-01-31 00:37:57,916 - performance_logger - INFO - 
+======================================================================
+2026-01-31 00:37:57,916 - performance_logger - INFO - EAGER MODE BENCHMARKING (No torch.compile)
+2026-01-31 00:37:57,916 - performance_logger - INFO - ======================================================================
+2026-01-31 00:37:57,916 - performance_logger - INFO - 
+Real Quantized (W8/W4 INT) Evaluation:
+2026-01-31 00:37:57,928 - performance_logger - INFO -   Model size: 3913.20 MB
+2026-01-31 00:39:22,526 - performance_logger - INFO -   Evaluation time (median): 41.141s  (mean: 41.141s)
+2026-01-31 00:39:22,526 - performance_logger - INFO -   Runs: 1, IQR: 0.0000s
+2026-01-31 00:39:22,526 - performance_logger - INFO - 
+Fake Quantized (FP32 simulation) Evaluation:
+2026-01-31 00:39:22,544 - performance_logger - INFO -   Model size: 3913.20 MB
+2026-01-31 00:40:45,676 - performance_logger - INFO -   Evaluation time (median): 41.383s  (mean: 41.383s)
+2026-01-31 00:40:45,676 - performance_logger - INFO -   Runs: 1, IQR: 0.0000s
+2026-01-31 00:40:45,676 - performance_logger - INFO - 
+Original FP32 Evaluation:
+2026-01-31 00:40:45,693 - performance_logger - INFO -   Model size: 3913.20 MB
+2026-01-31 00:42:10,016 - performance_logger - INFO -   Evaluation time (median): 42.759s  (mean: 42.759s)
+2026-01-31 00:42:10,016 - performance_logger - INFO -   Runs: 1, IQR: 0.0000s
+2026-01-31 00:42:10,016 - performance_logger - INFO - 
+======================================================================
+2026-01-31 00:42:10,016 - performance_logger - INFO - COMPILING MODELS with torch.compile(mode='max-autotune')
+2026-01-31 00:42:10,017 - performance_logger - INFO - ======================================================================
+2026-01-31 00:42:10,017 - performance_logger - INFO - Compiling Real Quantized model...
+2026-01-31 00:42:11,371 - performance_logger - INFO - Compiling Fake Quantized model...
+2026-01-31 00:42:11,375 - performance_logger - INFO - Compiling Original FP32 model...
+2026-01-31 00:42:11,379 - performance_logger - INFO - 
+Warming up COMPILED models (triggers compilation + graph optimization)...
+2026-01-31 00:42:11,379 - performance_logger - INFO -   - Compiling Real Quantized (this may take 1-2 minutes)...
+2026-01-31 00:42:43,189 - performance_logger - INFO -   - Compiling Fake Quantized...
+2026-01-31 00:47:01,045 - performance_logger - INFO -   - Compiling Original FP32...
+2026-01-31 00:47:06,168 - performance_logger - INFO -   - Post-compilation stabilization (2 iterations)...
+2026-01-31 00:47:37,669 - performance_logger - INFO -   ✓ All models compiled and warmed up
+
+2026-01-31 00:47:37,670 - performance_logger - INFO - ======================================================================
+2026-01-31 00:47:37,670 - performance_logger - INFO - COMPILED MODE BENCHMARKING (torch.compile enabled)
+2026-01-31 00:47:37,670 - performance_logger - INFO - ======================================================================
+2026-01-31 00:47:37,670 - performance_logger - INFO - 
+Real Quantized COMPILED (W8/W4 INT) Evaluation:
+2026-01-31 00:47:37,684 - performance_logger - INFO -   Model size: 3913.20 MB
+2026-01-31 01:14:00,747 - performance_logger - INFO -   Evaluation time (median): 587.131s  (mean: 587.131s)
+2026-01-31 01:14:00,747 - performance_logger - INFO -   Runs: 1, IQR: 0.0000s
+2026-01-31 01:14:00,747 - performance_logger - INFO - 
+Fake Quantized COMPILED (FP32) Evaluation:
+2026-01-31 01:14:00,761 - performance_logger - INFO -   Model size: 3913.20 MB
+2026-01-31 01:15:36,003 - performance_logger - INFO -   Evaluation time (median): 47.790s  (mean: 47.790s)
+2026-01-31 01:15:36,004 - performance_logger - INFO -   Runs: 1, IQR: 0.0000s
+2026-01-31 01:15:36,004 - performance_logger - INFO - 
+Original FP32 COMPILED Evaluation:
+2026-01-31 01:15:36,023 - performance_logger - INFO -   Model size: 3913.20 MB
+2026-01-31 01:17:15,424 - performance_logger - INFO -   Evaluation time (median): 50.200s  (mean: 50.200s)
+2026-01-31 01:17:15,424 - performance_logger - INFO -   Runs: 1, IQR: 0.0000s
+2026-01-31 01:17:15,424 - performance_logger - INFO - 
+======================================================================
+2026-01-31 01:17:15,424 - performance_logger - INFO - PERFORMANCE SUMMARY
+2026-01-31 01:17:15,424 - performance_logger - INFO - ======================================================================
+2026-01-31 01:17:15,424 - performance_logger - INFO - 
+EAGER MODE (No Compilation):
+2026-01-31 01:17:15,442 - performance_logger - INFO -   Real Quantized:  41.14s  (3913.20 MB)
+2026-01-31 01:17:15,459 - performance_logger - INFO -   Fake Quantized:  41.38s  (3913.20 MB)
+2026-01-31 01:17:15,475 - performance_logger - INFO -   Original FP32:   42.76s  (3913.20 MB)
+2026-01-31 01:17:15,475 - performance_logger - INFO -   Speedup vs FP32: 1.04x
+2026-01-31 01:17:15,475 - performance_logger - INFO -   Speedup vs Fake: 1.01x
+2026-01-31 01:17:15,475 - performance_logger - INFO - 
+COMPILED MODE (torch.compile):
+2026-01-31 01:17:15,475 - performance_logger - INFO -   Real Quantized:  587.13s
+2026-01-31 01:17:15,475 - performance_logger - INFO -   Fake Quantized:  47.79s
+2026-01-31 01:17:15,475 - performance_logger - INFO -   Original FP32:   50.20s
+2026-01-31 01:17:15,475 - performance_logger - INFO -   Speedup vs FP32: 0.09x
+2026-01-31 01:17:15,476 - performance_logger - INFO -   Speedup vs Fake: 0.08x
+2026-01-31 01:17:15,476 - performance_logger - INFO - 
+COMPILATION BENEFIT:
+2026-01-31 01:17:15,476 - performance_logger - INFO -   Real Quantized:  0.07x faster with compile
+2026-01-31 01:17:15,476 - performance_logger - INFO -   Fake Quantized:  0.87x faster with compile
+2026-01-31 01:17:15,476 - performance_logger - INFO -   Original FP32:   0.85x faster with compile
+2026-01-31 01:17:15,509 - performance_logger - INFO - 
+Model size reduction: 1.00x
+2026-01-31 01:17:15,509 - performance_logger - INFO - ======================================================================
+2026-01-31 01:57:15,870 - performance_logger - INFO - Loading checkpoint from data3/rogelio/logs_distill_2/exp001/ckpts/checkpoint_12-17_35.pt
+2026-01-31 01:57:19,712 - performance_logger - INFO - Model loaded. Missing keys: 144, Unexpected keys: 144
+2026-01-31 01:57:19,712 - performance_logger - INFO - Packing model to REAL integer weights...
+2026-01-31 01:57:19,726 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:19,827 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:19,841 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:19,853 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:19,865 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:19,874 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:19,885 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:19,897 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:19,911 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:19,921 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:19,930 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:19,942 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:19,953 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:19,965 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:19,977 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:19,988 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,000 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,013 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,025 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,037 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,048 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,060 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,072 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,087 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,103 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,115 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,127 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,138 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,150 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,162 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,174 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,186 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,197 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,209 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,221 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,233 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,244 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,260 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,272 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,284 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,295 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,307 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,319 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,333 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,345 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,356 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,370 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,382 - performance_logger - INFO - Enabled W4A4 for layer
+2026-01-31 01:57:20,383 - performance_logger - INFO - Replaced aggregator.frame_blocks.6.attn.qkv with Real Int Packed4 Layer
+2026-01-31 01:57:20,383 - performance_logger - INFO - Replaced aggregator.frame_blocks.6.attn.proj with Real Int Packed4 Layer
+2026-01-31 01:57:20,383 - performance_logger - INFO - Replaced aggregator.frame_blocks.6.mlp.fc1 with Real Int Packed4 Layer
+2026-01-31 01:57:20,383 - performance_logger - INFO - Replaced aggregator.frame_blocks.6.mlp.fc2 with Real Int Packed4 Layer
+2026-01-31 01:57:20,383 - performance_logger - INFO - Replaced aggregator.frame_blocks.7.attn.qkv with Real Int Packed4 Layer
+2026-01-31 01:57:20,383 - performance_logger - INFO - Replaced aggregator.frame_blocks.7.attn.proj with Real Int Packed4 Layer
+2026-01-31 01:57:20,383 - performance_logger - INFO - Replaced aggregator.frame_blocks.7.mlp.fc1 with Real Int Packed4 Layer
+2026-01-31 01:57:20,383 - performance_logger - INFO - Replaced aggregator.frame_blocks.7.mlp.fc2 with Real Int Packed4 Layer
+2026-01-31 01:57:20,384 - performance_logger - INFO - Replaced aggregator.frame_blocks.8.attn.qkv with Real Int Packed4 Layer
+2026-01-31 01:57:20,384 - performance_logger - INFO - Replaced aggregator.frame_blocks.8.attn.proj with Real Int Packed4 Layer
+2026-01-31 01:57:20,384 - performance_logger - INFO - Replaced aggregator.frame_blocks.8.mlp.fc1 with Real Int Packed4 Layer
+2026-01-31 01:57:20,384 - performance_logger - INFO - Replaced aggregator.frame_blocks.8.mlp.fc2 with Real Int Packed4 Layer
+2026-01-31 01:57:20,384 - performance_logger - INFO - Replaced aggregator.frame_blocks.9.attn.qkv with Real Int Packed4 Layer
+2026-01-31 01:57:20,384 - performance_logger - INFO - Replaced aggregator.frame_blocks.9.attn.proj with Real Int Packed4 Layer
+2026-01-31 01:57:20,384 - performance_logger - INFO - Replaced aggregator.frame_blocks.9.mlp.fc1 with Real Int Packed4 Layer
+2026-01-31 01:57:20,384 - performance_logger - INFO - Replaced aggregator.frame_blocks.9.mlp.fc2 with Real Int Packed4 Layer
+2026-01-31 01:57:20,384 - performance_logger - INFO - Replaced aggregator.frame_blocks.10.attn.qkv with Real Int Packed4 Layer
+2026-01-31 01:57:20,384 - performance_logger - INFO - Replaced aggregator.frame_blocks.10.attn.proj with Real Int Packed4 Layer
+2026-01-31 01:57:20,384 - performance_logger - INFO - Replaced aggregator.frame_blocks.10.mlp.fc1 with Real Int Packed4 Layer
+2026-01-31 01:57:20,384 - performance_logger - INFO - Replaced aggregator.frame_blocks.10.mlp.fc2 with Real Int Packed4 Layer
+2026-01-31 01:57:20,384 - performance_logger - INFO - Replaced aggregator.frame_blocks.11.attn.qkv with Real Int Packed4 Layer
+2026-01-31 01:57:20,384 - performance_logger - INFO - Replaced aggregator.frame_blocks.11.attn.proj with Real Int Packed4 Layer
+2026-01-31 01:57:20,384 - performance_logger - INFO - Replaced aggregator.frame_blocks.11.mlp.fc1 with Real Int Packed4 Layer
+2026-01-31 01:57:20,384 - performance_logger - INFO - Replaced aggregator.frame_blocks.11.mlp.fc2 with Real Int Packed4 Layer
+2026-01-31 01:57:20,384 - performance_logger - INFO - Replaced aggregator.global_blocks.6.attn.qkv with Real Int Packed4 Layer
+2026-01-31 01:57:20,384 - performance_logger - INFO - Replaced aggregator.global_blocks.6.attn.proj with Real Int Packed4 Layer
+2026-01-31 01:57:20,384 - performance_logger - INFO - Replaced aggregator.global_blocks.6.mlp.fc1 with Real Int Packed4 Layer
+2026-01-31 01:57:20,384 - performance_logger - INFO - Replaced aggregator.global_blocks.6.mlp.fc2 with Real Int Packed4 Layer
+2026-01-31 01:57:20,384 - performance_logger - INFO - Replaced aggregator.global_blocks.7.attn.qkv with Real Int Packed4 Layer
+2026-01-31 01:57:20,384 - performance_logger - INFO - Replaced aggregator.global_blocks.7.attn.proj with Real Int Packed4 Layer
+2026-01-31 01:57:20,384 - performance_logger - INFO - Replaced aggregator.global_blocks.7.mlp.fc1 with Real Int Packed4 Layer
+2026-01-31 01:57:20,384 - performance_logger - INFO - Replaced aggregator.global_blocks.7.mlp.fc2 with Real Int Packed4 Layer
+2026-01-31 01:57:20,384 - performance_logger - INFO - Replaced aggregator.global_blocks.8.attn.qkv with Real Int Packed4 Layer
+2026-01-31 01:57:20,384 - performance_logger - INFO - Replaced aggregator.global_blocks.8.attn.proj with Real Int Packed4 Layer
+2026-01-31 01:57:20,384 - performance_logger - INFO - Replaced aggregator.global_blocks.8.mlp.fc1 with Real Int Packed4 Layer
+2026-01-31 01:57:20,385 - performance_logger - INFO - Replaced aggregator.global_blocks.8.mlp.fc2 with Real Int Packed4 Layer
+2026-01-31 01:57:20,385 - performance_logger - INFO - Replaced aggregator.global_blocks.9.attn.qkv with Real Int Packed4 Layer
+2026-01-31 01:57:20,385 - performance_logger - INFO - Replaced aggregator.global_blocks.9.attn.proj with Real Int Packed4 Layer
+2026-01-31 01:57:20,385 - performance_logger - INFO - Replaced aggregator.global_blocks.9.mlp.fc1 with Real Int Packed4 Layer
+2026-01-31 01:57:20,385 - performance_logger - INFO - Replaced aggregator.global_blocks.9.mlp.fc2 with Real Int Packed4 Layer
+2026-01-31 01:57:20,385 - performance_logger - INFO - Replaced aggregator.global_blocks.10.attn.qkv with Real Int Packed4 Layer
+2026-01-31 01:57:20,385 - performance_logger - INFO - Replaced aggregator.global_blocks.10.attn.proj with Real Int Packed4 Layer
+2026-01-31 01:57:20,385 - performance_logger - INFO - Replaced aggregator.global_blocks.10.mlp.fc1 with Real Int Packed4 Layer
+2026-01-31 01:57:20,385 - performance_logger - INFO - Replaced aggregator.global_blocks.10.mlp.fc2 with Real Int Packed4 Layer
+2026-01-31 01:57:20,385 - performance_logger - INFO - Replaced aggregator.global_blocks.11.attn.qkv with Real Int Packed4 Layer
+2026-01-31 01:57:20,385 - performance_logger - INFO - Replaced aggregator.global_blocks.11.attn.proj with Real Int Packed4 Layer
+2026-01-31 01:57:20,385 - performance_logger - INFO - Replaced aggregator.global_blocks.11.mlp.fc1 with Real Int Packed4 Layer
+2026-01-31 01:57:20,385 - performance_logger - INFO - Replaced aggregator.global_blocks.11.mlp.fc2 with Real Int Packed4 Layer
+2026-01-31 01:57:20,385 - performance_logger - INFO - ======================================================================
+2026-01-31 01:57:20,385 - performance_logger - INFO - PROFILING CONFIGURATION
+2026-01-31 01:57:20,385 - performance_logger - INFO - ======================================================================
+2026-01-31 01:57:20,385 - performance_logger - INFO - NVTX markers enabled for nsys profiling
+2026-01-31 01:57:20,385 - performance_logger - INFO - Recommended nsys command:
+2026-01-31 01:57:20,385 - performance_logger - INFO -   nsys profile -o quantize_profile \
+2026-01-31 01:57:20,385 - performance_logger - INFO -     --capture-range=cudaProfilerApi \
+2026-01-31 01:57:20,385 - performance_logger - INFO -     --cuda-graph-trace=node \
+2026-01-31 01:57:20,385 - performance_logger - INFO -     python main.py --mode realquant ...
+2026-01-31 01:57:20,385 - performance_logger - INFO - ======================================================================
+
+2026-01-31 01:57:20,385 - performance_logger - INFO - ======================================================================
+2026-01-31 01:57:20,385 - performance_logger - INFO - WARMUP PHASE: Running 3 inference passes to initialize JIT/CUDA kernels
+2026-01-31 01:57:20,385 - performance_logger - INFO - This is SEPARATE from Timer's measurement - ensures stable baseline before benchmarking
+2026-01-31 01:57:20,385 - performance_logger - INFO - ======================================================================
+2026-01-31 01:57:36,851 - performance_logger - INFO - Warming up Real Quantized model (W8/W4 INT kernels)...
+2026-01-31 01:57:58,931 - performance_logger - INFO -   ✓ Real Quantized warmup complete (3 iterations)
+
+2026-01-31 01:57:58,931 - performance_logger - INFO - Warming up Fake Quantized model (FP32 simulation)...
+2026-01-31 01:58:20,633 - performance_logger - INFO -   ✓ Fake Quantized warmup complete (3 iterations)
+
+2026-01-31 01:58:20,633 - performance_logger - INFO - Warming up Original FP32 model...
+2026-01-31 01:58:41,620 - performance_logger - INFO -   ✓ Original model warmup complete (3 iterations)
+
+2026-01-31 01:58:41,621 - performance_logger - INFO - ======================================================================
+2026-01-31 01:58:41,621 - performance_logger - INFO - BENCHMARKING PHASE: Measuring actual performance
+2026-01-31 01:58:41,621 - performance_logger - INFO - ======================================================================
+2026-01-31 01:58:41,792 - performance_logger - INFO - 
+======================================================================
+2026-01-31 01:58:41,792 - performance_logger - INFO - EAGER MODE BENCHMARKING (No torch.compile)
+2026-01-31 01:58:41,792 - performance_logger - INFO - ======================================================================
+2026-01-31 01:58:42,718 - performance_logger - INFO - 
+Real Quantized (W8/W4 INT) Evaluation:
+2026-01-31 01:58:42,721 - performance_logger - INFO -   Model size: 3913.20 MB
+2026-01-31 02:00:57,429 - performance_logger - INFO -   Evaluation time (median): 64.551s  (mean: 64.551s)
+2026-01-31 02:00:57,430 - performance_logger - INFO -   Runs: 1, IQR: 0.0000s
+2026-01-31 02:00:57,430 - performance_logger - INFO - 
+Fake Quantized (FP32 simulation) Evaluation:
+2026-01-31 02:00:57,434 - performance_logger - INFO -   Model size: 3913.20 MB
+2026-01-31 02:03:14,951 - performance_logger - INFO -   Evaluation time (median): 69.132s  (mean: 69.132s)
+2026-01-31 02:03:14,951 - performance_logger - INFO -   Runs: 1, IQR: 0.0000s
+2026-01-31 02:03:14,951 - performance_logger - INFO - 
+Original FP32 Evaluation:
+2026-01-31 02:03:14,955 - performance_logger - INFO -   Model size: 3913.20 MB
+2026-01-31 02:05:31,193 - performance_logger - INFO -   Evaluation time (median): 67.818s  (mean: 67.818s)
+2026-01-31 02:05:31,193 - performance_logger - INFO -   Runs: 1, IQR: 0.0000s

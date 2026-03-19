@@ -63,6 +63,14 @@ if __name__ == '__main__':
         "MinMax_quantizer": MinMax_quantizer, # Careful it is dynamic
         "LSQ_quantizer": LSQ_quantizer,
         "LSQC_quantizer": LSQC_quantizer,
+        "LSQS_quantizer": LSQS_quantizer,
+        "LSQBH_quantizer": LSQBH_quantizer,
+        "LSQSC_quantizer": LSQSC_quantizer,
+        "LSQH_quantizer": LSQH_quantizer,
+        "LSQA2_quantizer": LSQA2_quantizer,
+        "LSQHB_quantizer": LSQHB_quantizer,   # Hadamard + Binary (1-bit, BRIEF-inspired)
+        "LSQHD_quantizer": LSQHD_quantizer,   # Hadamard + Diagonal sign flip (QuIP#-style)
+        "LSQHS_quantizer": LSQHS_quantizer,   # SmoothQuant migration pre-Hadamard rotation
         "LCQ_quantizer": LCQ_quantizer,
         "APoT_quantizer": APoT_quantizer,
         "Positive_nuLSQ_quantizer": Positive_nuLSQ_quantizer,
@@ -73,7 +81,9 @@ if __name__ == '__main__':
         "NMSE_initializer": NMSE_initializer,
         "LSQ_initializer": LSQ_initializer,
         "LSQC_initializer": LSQC_initializer,
+        "LSQS_initializer": LSQS_initializer(),
         "Const_initializer": Const_initializer,
+        "LSQHB_initializer": LSQHB_initializer,  # mean(|x|) init for binary quantization
         "None": None
     }
     config.lr = args.lr
