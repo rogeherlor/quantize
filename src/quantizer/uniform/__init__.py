@@ -10,3 +10,4 @@ from .lsqa2 import LSQA2_quantizer
 from .lsqhb import LSQHB_quantizer
 from .lsqhd import LSQHD_quantizer
 from .lsqhs import LSQHS_quantizer
+from .lsqt import LSQT_quantizer

@@ -71,6 +71,7 @@ if __name__ == '__main__':
         "LSQHB_quantizer": LSQHB_quantizer,   # Hadamard + Binary (1-bit, BRIEF-inspired)
         "LSQHD_quantizer": LSQHD_quantizer,   # Hadamard + Diagonal sign flip (QuIP#-style)
         "LSQHS_quantizer": LSQHS_quantizer,   # SmoothQuant migration pre-Hadamard rotation
+        "LSQT_quantizer": LSQT_quantizer,     # TurboQuant: Hadamard + Lloyd-Max codebook
         "LCQ_quantizer": LCQ_quantizer,
         "APoT_quantizer": APoT_quantizer,
         "Positive_nuLSQ_quantizer": Positive_nuLSQ_quantizer,
@@ -84,6 +85,8 @@ if __name__ == '__main__':
         "LSQS_initializer": LSQS_initializer(),
         "Const_initializer": Const_initializer,
         "LSQHB_initializer": LSQHB_initializer,  # mean(|x|) init for binary quantization
+        "LSQT_initializer": LSQT_initializer,    # std(x) init for Lloyd-Max codebook N(0,1)
+        "LSQA2_initializer": LSQA2_initializer,  # per-channel NMSE init for power-of-2 shifts
         "None": None
     }
     config.lr = args.lr

@@ -95,20 +95,11 @@ class LSQA2_quantizer(nn.Module):
         if 'scale_base' in Qparms:
             if 'init_scale' in Qparms:
                 init_scales = Qparms['init_scale']
-                if init_scales.numel() > 1:
-                    base_scale, shifts = _compute_base_and_shifts(init_scales)
-                    Qparms['scale_base'].data = torch.tensor(
-                        [base_scale], device=Qparms['scale_base'].device
-                    )
-                    Qparms['scale_shifts'].data = shifts.to(Qparms['scale_shifts'].device)
-                else:
-                    # Scalar init → base scale only, zero shifts (equivalent to LSQ)
-                    Qparms['scale_base'].data = torch.full(
-                        Qparms['scale_base'].size(),
-                        init_scales.item(),
-                        device=Qparms['scale_base'].device,
-                    )
-                    Qparms['scale_shifts'].data.zero_()
+                base_scale, shifts = _compute_base_and_shifts(init_scales)
+                Qparms['scale_base'].data = torch.tensor(
+                    [base_scale], device=Qparms['scale_base'].device
+                )
+                Qparms['scale_shifts'].data = shifts.to(Qparms['scale_shifts'].device)
         else:
             if 'init_scale' in Qparms:
                 Qparms['scale'].data = torch.full(
@@ -163,6 +154,47 @@ def _compute_base_and_shifts(init_scales):
     log2_relative = torch.log2(torch.clamp(relative_scales, min=1e-8))
     shifts = torch.round(log2_relative)
     return base_scale, shifts
+
+
+# -------------------------------------------------------
+# LSQA2 initializer
+# -------------------------------------------------------
+# Activation mode: computes per-input-channel (d_in,) scales using the NMSE
+# formula applied per column.  This gives _compute_base_and_shifts a meaningful
+# spread of per-channel scales to decompose into a base + power-of-2 shifts.
+#
+# Weight mode: falls back to scalar NMSE (weights use the scalar scale path).
+# -------------------------------------------------------
+
+_DELTA_NORMAL_ASYM = {
+    3: 0.65076985, 7: 0.35340955, 15: 0.19324868,
+    31: 0.10548752, 63: 0.0572659, 127: 0.03087133, 255: 0.01652923,
+}
+
+def LSQA2_initializer(x, Qparms, Qn, Qp, quantizer, mode):
+    qp = int(Qp)
+    if 'scale_base' in Qparms:
+        # Per-input-channel path: reshape to (N, d_in), compute per-column NMSE scale.
+        x_2d = x.detach().float().reshape(-1, x.shape[-1])   # (N, d_in)
+        if qp in _DELTA_NORMAL_ASYM:
+            # Asymmetric NMSE std estimate: sqrt(2 * mean(x²)) matches NMSE_initializer.
+            per_ch_std = (2.0 * (x_2d ** 2).mean(dim=0)) ** 0.5
+            per_ch_scale = per_ch_std * _DELTA_NORMAL_ASYM[qp]
+        else:
+            # Fallback: MinMax per channel.
+            per_ch_scale = x_2d.abs().amax(dim=0) / max(qp, 1)
+        Qparms["init_scale"] = per_ch_scale.clamp(min=1e-6)
+    else:
+        # Scalar weight path: same as NMSE_initializer asymmetric.
+        x_flat = x.detach().float()
+        x_std = (2.0 * (x_flat ** 2).mean()) ** 0.5
+        if qp in _DELTA_NORMAL_ASYM:
+            scale_tmp = x_std * _DELTA_NORMAL_ASYM[qp]
+        else:
+            scale_tmp = x_flat.abs().mean() * 2.0
+        scale_tmp = scale_tmp.clamp(min=1e-6)
+        if "init_scale" not in Qparms or scale_tmp > Qparms["init_scale"]:
+            Qparms["init_scale"] = scale_tmp
 
 
 # -------------------------------------------------------

@@ -14,7 +14,7 @@ from src.ptq.quarot.quarot_utils import random_hadamard_matrix
 
 # Quantizer classes that require full (d_in × d_in) Hadamard rotation on both x and w.
 # Rotation is applied in _forward_common; these quantizers operate in rotated space.
-_FULL_HADAMARD_QUANTIZERS = frozenset({'LSQH_quantizer', 'LSQHB_quantizer', 'LSQHD_quantizer', 'LSQHS_quantizer'})
+_FULL_HADAMARD_QUANTIZERS = frozenset({'LSQH_quantizer', 'LSQHB_quantizer', 'LSQHD_quantizer', 'LSQHS_quantizer', 'LSQT_quantizer'})
 
 # Quantizer classes that additionally apply a random diagonal sign flip D = diag(d ∈ {±1}^d_in)
 # *before* the Hadamard: x_eff = (x * d) @ H.  D·H is strictly more incoherent than H alone.
