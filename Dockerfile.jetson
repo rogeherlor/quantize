@@ -1,0 +1,40 @@
+# Dockerfile for Jetson Orin (aarch64, JetPack 6.x, L4T r36.x)
+# MUST be built on the Jetson itself — this is an aarch64 image.
+#
+# Base image ships PyTorch compiled for CC 8.7 (Orin), fixing the
+# "compute capability 8.7 not supported" crash from standard PyPI wheels.
+#
+# Available tags for r36.4.x (hub.docker.com/r/dustynv/pytorch/tags):
+#   dustynv/pytorch:2.7-r36.4.0          <- PyTorch 2.7, L4T r36.4.x (this device, CUDA 12.6)
+#   dustynv/pytorch:2.6-r36.4.0-cu128    <- PyTorch 2.6, requires CUDA 12.8 driver
+FROM dustynv/pytorch:2.7-r36.4.0
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    ca-certificates \
+    build-essential \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxrender1 \
+    libxext6 \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/python3 /usr/local/bin/python
+
+COPY requirements.jetson.txt /workspace/requirements.jetson.txt
+
+WORKDIR /workspace
+
+# The base image sets pypi.jetson-ai-lab.dev as the primary pip index, which is
+# unreachable during `docker build`. Override to standard PyPI for extra deps.
+# Torch/torchvision are NOT in requirements.jetson.txt, so nothing Jetson-specific is lost.
+RUN pip install --no-cache-dir --index-url https://pypi.org/simple/ "numpy>=1.23,<2.0" && \
+    pip install --no-cache-dir \
+    --index-url https://pypi.org/simple/ \
+    --extra-index-url https://pypi.ngc.nvidia.com \
+    -r /workspace/requirements.jetson.txt
+
+CMD ["/bin/bash"]

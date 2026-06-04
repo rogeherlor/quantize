@@ -136,6 +136,10 @@ def _extract_test_images(
         dest = output_dir / name
         if skip_existing and dest.exists():
             continue
+        # Handle edge case: if dest.parent is a file (from previous failed extraction),
+        # remove it and recreate as directory
+        if dest.parent.exists() and dest.parent.is_file():
+            dest.parent.unlink()
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(zf.read(name))
         extracted += 1
@@ -229,8 +233,41 @@ def _process_category(
     pending_zips: list[Path] = []   # ZIPs downloaded before metadata was found
 
     set_lists_path = cat_dir / "set_lists" / "set_lists_fewview_dev.json"
+    done_marker    = output_dir / f".{category}.done"
+
+    # Check if category was already successfully processed
+    if done_marker.exists():
+        with open(done_marker) as f:
+            result = json.load(f)
+        print(f"[{category}] already processed (cached), skipping download")
+        return result
+
+    # Also check if it was processed with an older version (check for final annotation files)
+    train_anno = anno_dir / f"{category}_train.jgz"
+    test_anno = anno_dir / f"{category}_test.jgz"
+    if set_lists_path.exists() and train_anno.exists() and test_anno.exists():
+        # Category was already fully processed, just create marker and return
+        with open(set_lists_path) as f:
+            sl = json.load(f)
+        test_seqs = {entry[0] for entry in sl.get("test", [])}
+        train_n = len(sl.get("train", []))
+        test_n = len(sl.get("test", []))
+        
+        result = {
+            "category": category,
+            "images": 0,  # We don't have the count from old run, but it doesn't matter for summary
+            "test_seqs": len(test_seqs),
+            "train_frames": train_n,
+            "test_frames": test_n,
+            "status": "ok",
+        }
+        done_marker.write_text(json.dumps(result))
+        print(f"[{category}] already fully processed (from previous run), skipping download")
+        return result
 
     # Metadata may already be present from a previous run
+    meta_ready = False
+    test_seqs: set[str] = set()
     if set_lists_path.exists():
         with open(set_lists_path) as f:
             sl = json.load(f)
@@ -247,7 +284,19 @@ def _process_category(
         else:
             print(f"[{category}] already downloaded {zip_name}")
 
-        with zipfile.ZipFile(zip_path) as zf:
+        # Validate zip file integrity; re-download if corrupted
+        try:
+            zf = zipfile.ZipFile(zip_path)
+        except zipfile.BadZipFile:
+            print(f"[{category}] {zip_name} is corrupted, re-downloading…")
+            zip_path.unlink(missing_ok=True)
+            _download_zip(url, zip_path, f"{category} {zip_name}")
+            zf = zipfile.ZipFile(zip_path)
+        except Exception as e:
+            print(f"[{category}] error opening {zip_name}: {e}, skipping")
+            continue
+
+        with zf:
             if not meta_ready:
                 if _extract_metadata(zf, category, output_dir):
                     meta_ready = True
@@ -258,7 +307,14 @@ def _process_category(
 
                     # Back-fill: extract images from ZIPs downloaded before metadata was found
                     for prev_path in pending_zips:
-                        with zipfile.ZipFile(prev_path) as prev_zf:
+                        try:
+                            prev_zf = zipfile.ZipFile(prev_path)
+                        except zipfile.BadZipFile:
+                            print(f"[{category}] {prev_path.name} is corrupted, skipping")
+                            if not keep_zips:
+                                prev_path.unlink(missing_ok=True)
+                            continue
+                        with prev_zf:
                             n = _extract_test_images(
                                 prev_zf, category, test_seqs, output_dir, skip_existing
                             )
@@ -291,14 +347,15 @@ def _process_category(
 
     if not meta_ready:
         print(f"[{category}] WARNING: never found metadata — category skipped")
-        return {"category": category, "images": 0, "test_seqs": 0, "status": "no_metadata"}
+        result = {"category": category, "images": 0, "test_seqs": 0, "status": "no_metadata"}
+        return result
 
     # Preprocess annotations
     anno_dir.mkdir(parents=True, exist_ok=True)
     train_n, test_n = _preprocess_category(category, output_dir, anno_dir)
     print(f"[{category}] annotations: {train_n} train frames, {test_n} test frames")
 
-    return {
+    result = {
         "category":  category,
         "images":    total_images,
         "test_seqs": len(test_seqs),
@@ -306,6 +363,10 @@ def _process_category(
         "test_frames":  test_n,
         "status": "ok",
     }
+
+    # Write completion marker for resume support
+    done_marker.write_text(json.dumps(result))
+    return result
 
 
 # ---------------------------------------------------------------------------

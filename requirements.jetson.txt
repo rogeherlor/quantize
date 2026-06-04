@@ -1,0 +1,28 @@
+# Jetson Orin requirements — torch and torchvision come from the l4t-pytorch base image
+# Do NOT add torch/torchvision here; the l4t base provides CC 8.7-compatible wheels
+
+onnx == 1.18.0
+numpy >= 1.23, < 2.0
+pyyaml == 6.0.2
+tensorboard == 2.19.0
+tensorboard-data-server == 0.7.2
+tqdm == 4.67.1
+requests == 2.32.4
+matplotlib == 3.10.3
+
+huggingface_hub == 0.34.3
+einops == 0.8.1
+hydra-core == 1.3.2
+iopath == 0.1.10
+wcmatch == 10.1
+opencv-python == 4.9.0.80
+fvcore == 0.1.5.post20221221
+
+# pycolmap and pyceres have no prebuilt aarch64 wheels.
+# They are only needed when --use_ba is passed, which is disabled on Jetson evaluation.
+# Build from source if bundle adjustment is ever needed on Jetson.
+
+ipdb == 0.13.13
+git+https://github.com/cvg/LightGlue.git
+
+timm == 1.0.20

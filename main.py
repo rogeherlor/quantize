@@ -37,6 +37,7 @@ if __name__ == '__main__':
     parser.add_argument('--mode', type=str, default='QAT', help='mode: QAT, PTQ or STATS')
     parser.add_argument('--num_bits', type=int, help='quantization bit-width')
     parser.add_argument('--accelerator', type=str, default='GPU', help='accelerator: GPU or HAILO')
+    parser.add_argument('--jetson', action='store_true', help='Jetson Orin mode: loads model in FP16 to fit in unified memory')
     
     # PTQ parameters
     parser.add_argument('--ptq_algorithm', type=str, default='gptq', help='PTQ algorithm: gptq, rtn')
@@ -104,6 +105,7 @@ if __name__ == '__main__':
     config.train_id = args.train_id
     config.first_run = args.first_run
     config.init_from = args.init_from if args.init_from != None else None
+    config.jetson = args.jetson
     
     # PTQ specific config
     config.ptq_algorithm = args.ptq_algorithm

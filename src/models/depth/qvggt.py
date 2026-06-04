@@ -18,8 +18,21 @@ from src.make_ex_name import *
 
 from src.models.depth.vggt.evaluation.test_co3d import *
 
-def run_evaluation_vggt(model, model_path=None):
+def _default_dpt_chunk():
+    if torch.cuda.is_available():
+        vram_gb = torch.cuda.get_device_properties(0).total_memory / 1024**3
+        if vram_gb < 10:
+            logger.info(f"[Jetson] Detected {vram_gb:.1f} GB VRAM — using DPT frames_chunk_size=2 "
+                        f"(vs default 8) to fit 10-frame activations in unified memory.")
+            return 2
+    return 8
+
+def run_evaluation_vggt(model, model_path=None, frames_chunk_size=None):
     """Main function to evaluate VGGT on CO3D dataset. Original vggt/evaluation/test_co3d.py"""
+    if frames_chunk_size is None:
+        frames_chunk_size = _default_dpt_chunk()
+    else:
+        logger.info(f"DPT frames_chunk_size={frames_chunk_size} (explicit)")
     args = argparse.Namespace()
     args.debug = False
     args.use_ba = False
@@ -27,11 +40,22 @@ def run_evaluation_vggt(model, model_path=None):
     args.min_num_images = 50
     args.num_frames = 10
     args.co3d_dir = "data3/rogelio/co3d/dataset/"
-    args.co3d_anno_dir = "data3/rogelio/co3d/preprocessed_dataset/"
+    args.co3d_anno_dir = "data3/rogelio/co3d/preprocessed_dataset"
     args.seed = 0
     
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    dtype = torch.bfloat16 if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8 else torch.float16
+    sm_major = torch.cuda.get_device_capability()[0] if torch.cuda.is_available() else 0
+    vram_gb = torch.cuda.get_device_properties(0).total_memory / 1024**3 if torch.cuda.is_available() else 99
+    if vram_gb < 10:
+        # Jetson: model is loaded as FP16. Using BF16 autocast with FP16 weights
+        # makes PyTorch cast each weight tensor to BF16 via cuDNN workspace
+        # allocations that bypass the caching allocator → NvMap ENOMEM assert.
+        # FP16 autocast on a FP16 model is a no-op: no casting, no extra allocs.
+        dtype = torch.float16
+        logger.info(f"Evaluation dtype: torch.float16 (Jetson {vram_gb:.1f} GB — matching model dtype, avoids BF16 cast overhead)")
+    else:
+        dtype = torch.bfloat16 if sm_major >= 8 else torch.float16
+        logger.info(f"Evaluation dtype: {dtype} (SM{sm_major}.x — {'bfloat16 supported' if sm_major >= 8 else 'fallback to float16'})")
 
     # Set random seeds
     set_random_seeds(args.seed)
@@ -61,7 +85,7 @@ def run_evaluation_vggt(model, model_path=None):
             with gzip.open(annotation_file, "r") as fin:
                 annotation = json.loads(fin.read())
         except FileNotFoundError:
-            print(f"Annotation file not found for {category}, skipping")
+            logger.info(f"Annotation file not found: {os.path.abspath(annotation_file)}")
             continue
 
         rError = []
@@ -87,6 +111,9 @@ def run_evaluation_vggt(model, model_path=None):
             seq_rError, seq_tError = process_sequence(
                 model, seq_name, seq_data, category, args.co3d_dir,
                 args.min_num_images, args.num_frames, args.use_ba, device, dtype,
+                frames_chunk_size=frames_chunk_size,
+                clear_cache=(frames_chunk_size >= 8),  # False on Jetson: empty_cache destroys activation pool
+                use_autocast=(frames_chunk_size >= 8),  # False on Jetson: autocast queries NVML → assert
             )
 
             logger.info("-" * 50)
@@ -160,10 +187,21 @@ def run_test_vggt(args):
     with initialize(version_base=None, config_path="vggt/training/config"):
         cfg = compose(config_name="default")
 
-    trainer = Trainer(**cfg)
+    is_jetson = getattr(args, 'jetson', False)
+    model_dtype = "float16" if is_jetson else "float32"
+    logger.info(f"[{'Jetson' if is_jetson else 'Server'}] model_dtype={model_dtype}")
+    if is_jetson:
+        # NCCL probes P2P capability even with one GPU, which Jetson's NVML doesn't support.
+        from omegaconf import OmegaConf
+        cfg = OmegaConf.merge(cfg, {"distributed": {"backend": "gloo"}})
+        logger.info("[Jetson] Switched distributed backend: NCCL → gloo (NVML P2P not supported)")
+    trainer = Trainer(**cfg, model_dtype=model_dtype)
     trainer.model.module = replace(args, trainer.model.module)
-    trainer._load_resuming_checkpoint(args.init_from)
-    run_evaluation_vggt(trainer.model.module)
+    if args.init_from:
+        trainer._load_resuming_checkpoint(args.init_from)
+    chunk = 2 if is_jetson else 8
+    logger.info(f"[{'Jetson' if is_jetson else 'Server'}] DPT frames_chunk_size={chunk}")
+    run_evaluation_vggt(trainer.model.module, frames_chunk_size=chunk)
 
 def replace(args, net):
     logger.info("==> Replacing model parameters..")

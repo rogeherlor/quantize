@@ -43,5 +43,33 @@ services:
     network_mode: "host"
     shm_size: 32g
 
+  quantize-jetson:
+    build:
+      context: .
+      dockerfile: Dockerfile.jetson
+    container_name: quantize-jetson
+    privileged: true
+    profiles:
+      - quantize-jetson
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - NCCL_P2P_DISABLE=1
+      # PYTORCH_CUDA_ALLOC_CONF is set per-run in infer.py:
+      #   FP16: expandable_segments:True,garbage_collection_threshold:0.99
+      #   FP32: "" (default caching allocator + explicit pool pre-allocation)
+    volumes:
+      - ./:/workspace
+      - /ssd/co3d:/workspace/data3/rogelio/co3d
+      - /ssd/profiles:/workspace/data3/rogelio/profiles
+      # - /data3/rogelio:/workspace/data3
+    stdin_open: true
+    tty: true
+    command: /bin/bash -c "tail -f /dev/null"
+    network_mode: "host"
+    shm_size: 512m
+
 # docker-compose --profile quantize-gpu up --build -d
 # docker-compose --profile quantize-cpu up --build -d
+# docker-compose --profile quantize-jetson up --build -d  (run ON the Jetson)
