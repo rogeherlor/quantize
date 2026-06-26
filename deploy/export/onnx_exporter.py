@@ -23,14 +23,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 import torch
 import torch.nn as nn
-import onnx
-import onnxsim
 
 import src.module_quantization as Q
-from src.run_realquant import QLAYERS, pack_model_to_real_int
-from src.run_distill import selective_quantize_layers
-from src.models.depth.vggt.training.trainer import Trainer
-from hydra import initialize, compose
+
+# NOTE: heavy / optional deps (onnx, onnxsim, hydra, Trainer) are imported lazily
+# inside export_vggt_to_onnx so that lightweight consumers can `from
+# deploy.export.onnx_exporter import _ExportQLinear` without pulling them in.
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -174,6 +172,12 @@ def export_vggt_to_onnx(
         opset:           ONNX opset version (17 recommended for Q/DQ support).
         simplify:        Run onnxsim.simplify after export.
     """
+    import onnx
+    from src.run_realquant import QLAYERS
+    from src.run_distill import selective_quantize_layers
+    from src.models.depth.vggt.training.trainer import Trainer
+    from hydra import initialize, compose
+
     if layer_prefixes is None:
         layer_prefixes = QLAYERS
 
@@ -226,6 +230,7 @@ def export_vggt_to_onnx(
     print('ONNX model validation passed.')
 
     if simplify:
+        import onnxsim
         sim_model, ok = onnxsim.simplify(onnx_model)
         if ok:
             onnx.save(sim_model, output_path)

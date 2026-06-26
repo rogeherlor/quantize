@@ -347,3 +347,299 @@ Original FP32 Evaluation:
 2026-01-31 02:03:14,955 - performance_logger - INFO -   Model size: 3913.20 MB
 2026-01-31 02:05:31,193 - performance_logger - INFO -   Evaluation time (median): 67.818s  (mean: 67.818s)
 2026-01-31 02:05:31,193 - performance_logger - INFO -   Runs: 1, IQR: 0.0000s
+2026-06-11 15:30:04,496 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:30:04,506 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:55:18,883 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:55:18,902 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:45,503 - performance_logger - INFO - Packing model to REAL integer weights...
+2026-06-11 15:53:45,817 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:45,823 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:45,834 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:45,843 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:45,852 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:45,856 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:45,871 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:45,876 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:45,887 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:45,891 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:45,903 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:45,913 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:45,927 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:45,931 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:45,938 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:45,943 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:45,948 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:45,953 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:45,957 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:45,962 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:45,967 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:45,972 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:45,978 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:45,983 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:45,991 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:45,995 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:45,999 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:46,004 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:46,009 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:46,014 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:46,019 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:46,024 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:46,029 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:46,033 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:46,036 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:46,042 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:46,046 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:46,051 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:46,056 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:46,061 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:46,068 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:46,073 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:46,076 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:46,081 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:46,088 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:46,092 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:46,096 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:46,101 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 15:53:46,109 - performance_logger - INFO - Replaced aggregator.frame_blocks.6.attn.qkv with Real Int torch.int8 Layer
+2026-06-11 15:53:46,109 - performance_logger - INFO - Replaced aggregator.frame_blocks.6.attn.proj with Real Int torch.int8 Layer
+2026-06-11 15:53:46,110 - performance_logger - INFO - Replaced aggregator.frame_blocks.6.mlp.fc1 with Real Int torch.int8 Layer
+2026-06-11 15:53:46,110 - performance_logger - INFO - Replaced aggregator.frame_blocks.6.mlp.fc2 with Real Int torch.int8 Layer
+2026-06-11 15:53:46,111 - performance_logger - INFO - Replaced aggregator.frame_blocks.7.attn.qkv with Real Int torch.int8 Layer
+2026-06-11 15:53:46,111 - performance_logger - INFO - Replaced aggregator.frame_blocks.7.attn.proj with Real Int torch.int8 Layer
+2026-06-11 15:53:46,111 - performance_logger - INFO - Replaced aggregator.frame_blocks.7.mlp.fc1 with Real Int torch.int8 Layer
+2026-06-11 15:53:46,111 - performance_logger - INFO - Replaced aggregator.frame_blocks.7.mlp.fc2 with Real Int torch.int8 Layer
+2026-06-11 15:53:46,112 - performance_logger - INFO - Replaced aggregator.frame_blocks.8.attn.qkv with Real Int torch.int8 Layer
+2026-06-11 15:53:46,112 - performance_logger - INFO - Replaced aggregator.frame_blocks.8.attn.proj with Real Int torch.int8 Layer
+2026-06-11 15:53:46,112 - performance_logger - INFO - Replaced aggregator.frame_blocks.8.mlp.fc1 with Real Int torch.int8 Layer
+2026-06-11 15:53:46,112 - performance_logger - INFO - Replaced aggregator.frame_blocks.8.mlp.fc2 with Real Int torch.int8 Layer
+2026-06-11 15:53:46,113 - performance_logger - INFO - Replaced aggregator.frame_blocks.9.attn.qkv with Real Int torch.int8 Layer
+2026-06-11 15:53:46,113 - performance_logger - INFO - Replaced aggregator.frame_blocks.9.attn.proj with Real Int torch.int8 Layer
+2026-06-11 15:53:46,113 - performance_logger - INFO - Replaced aggregator.frame_blocks.9.mlp.fc1 with Real Int torch.int8 Layer
+2026-06-11 15:53:46,113 - performance_logger - INFO - Replaced aggregator.frame_blocks.9.mlp.fc2 with Real Int torch.int8 Layer
+2026-06-11 15:53:46,113 - performance_logger - INFO - Replaced aggregator.frame_blocks.10.attn.qkv with Real Int torch.int8 Layer
+2026-06-11 15:53:46,114 - performance_logger - INFO - Replaced aggregator.frame_blocks.10.attn.proj with Real Int torch.int8 Layer
+2026-06-11 15:53:46,114 - performance_logger - INFO - Replaced aggregator.frame_blocks.10.mlp.fc1 with Real Int torch.int8 Layer
+2026-06-11 15:53:46,114 - performance_logger - INFO - Replaced aggregator.frame_blocks.10.mlp.fc2 with Real Int torch.int8 Layer
+2026-06-11 15:53:46,114 - performance_logger - INFO - Replaced aggregator.frame_blocks.11.attn.qkv with Real Int torch.int8 Layer
+2026-06-11 15:53:46,115 - performance_logger - INFO - Replaced aggregator.frame_blocks.11.attn.proj with Real Int torch.int8 Layer
+2026-06-11 15:53:46,115 - performance_logger - INFO - Replaced aggregator.frame_blocks.11.mlp.fc1 with Real Int torch.int8 Layer
+2026-06-11 15:53:46,115 - performance_logger - INFO - Replaced aggregator.frame_blocks.11.mlp.fc2 with Real Int torch.int8 Layer
+2026-06-11 15:53:46,115 - performance_logger - INFO - Replaced aggregator.global_blocks.6.attn.qkv with Real Int torch.int8 Layer
+2026-06-11 15:53:46,115 - performance_logger - INFO - Replaced aggregator.global_blocks.6.attn.proj with Real Int torch.int8 Layer
+2026-06-11 15:53:46,116 - performance_logger - INFO - Replaced aggregator.global_blocks.6.mlp.fc1 with Real Int torch.int8 Layer
+2026-06-11 15:53:46,116 - performance_logger - INFO - Replaced aggregator.global_blocks.6.mlp.fc2 with Real Int torch.int8 Layer
+2026-06-11 15:53:46,116 - performance_logger - INFO - Replaced aggregator.global_blocks.7.attn.qkv with Real Int torch.int8 Layer
+2026-06-11 15:53:46,117 - performance_logger - INFO - Replaced aggregator.global_blocks.7.attn.proj with Real Int torch.int8 Layer
+2026-06-11 15:53:46,117 - performance_logger - INFO - Replaced aggregator.global_blocks.7.mlp.fc1 with Real Int torch.int8 Layer
+2026-06-11 15:53:46,117 - performance_logger - INFO - Replaced aggregator.global_blocks.7.mlp.fc2 with Real Int torch.int8 Layer
+2026-06-11 15:53:46,117 - performance_logger - INFO - Replaced aggregator.global_blocks.8.attn.qkv with Real Int torch.int8 Layer
+2026-06-11 15:53:46,118 - performance_logger - INFO - Replaced aggregator.global_blocks.8.attn.proj with Real Int torch.int8 Layer
+2026-06-11 15:53:46,118 - performance_logger - INFO - Replaced aggregator.global_blocks.8.mlp.fc1 with Real Int torch.int8 Layer
+2026-06-11 15:53:46,118 - performance_logger - INFO - Replaced aggregator.global_blocks.8.mlp.fc2 with Real Int torch.int8 Layer
+2026-06-11 15:53:46,118 - performance_logger - INFO - Replaced aggregator.global_blocks.9.attn.qkv with Real Int torch.int8 Layer
+2026-06-11 15:53:46,119 - performance_logger - INFO - Replaced aggregator.global_blocks.9.attn.proj with Real Int torch.int8 Layer
+2026-06-11 15:53:46,119 - performance_logger - INFO - Replaced aggregator.global_blocks.9.mlp.fc1 with Real Int torch.int8 Layer
+2026-06-11 15:53:46,119 - performance_logger - INFO - Replaced aggregator.global_blocks.9.mlp.fc2 with Real Int torch.int8 Layer
+2026-06-11 15:53:46,119 - performance_logger - INFO - Replaced aggregator.global_blocks.10.attn.qkv with Real Int torch.int8 Layer
+2026-06-11 15:53:46,120 - performance_logger - INFO - Replaced aggregator.global_blocks.10.attn.proj with Real Int torch.int8 Layer
+2026-06-11 15:53:46,120 - performance_logger - INFO - Replaced aggregator.global_blocks.10.mlp.fc1 with Real Int torch.int8 Layer
+2026-06-11 15:53:46,120 - performance_logger - INFO - Replaced aggregator.global_blocks.10.mlp.fc2 with Real Int torch.int8 Layer
+2026-06-11 15:53:46,120 - performance_logger - INFO - Replaced aggregator.global_blocks.11.attn.qkv with Real Int torch.int8 Layer
+2026-06-11 15:53:46,121 - performance_logger - INFO - Replaced aggregator.global_blocks.11.attn.proj with Real Int torch.int8 Layer
+2026-06-11 15:53:46,121 - performance_logger - INFO - Replaced aggregator.global_blocks.11.mlp.fc1 with Real Int torch.int8 Layer
+2026-06-11 15:53:46,121 - performance_logger - INFO - Replaced aggregator.global_blocks.11.mlp.fc2 with Real Int torch.int8 Layer
+2026-06-11 16:28:05,729 - performance_logger - INFO - Packing model to REAL integer weights...
+2026-06-11 16:28:06,054 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,058 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,062 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,068 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,073 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,077 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,083 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,088 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,094 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,098 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,101 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,107 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,112 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,116 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,121 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,126 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,131 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,135 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,139 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,145 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,150 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,154 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,159 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,164 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,171 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,175 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,179 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,184 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,189 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,193 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,198 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,204 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,208 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,212 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,219 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,224 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,229 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,233 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,238 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,243 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,248 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,252 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,255 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,260 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,265 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,269 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,274 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,279 - performance_logger - INFO - Enabled W8A8 for layer
+2026-06-11 16:28:06,288 - performance_logger - INFO - Replaced aggregator.frame_blocks.6.attn.qkv with Real Int torch.int8 Layer
+2026-06-11 16:28:06,289 - performance_logger - INFO - Replaced aggregator.frame_blocks.6.attn.proj with Real Int torch.int8 Layer
+2026-06-11 16:28:06,289 - performance_logger - INFO - Replaced aggregator.frame_blocks.6.mlp.fc1 with Real Int torch.int8 Layer
+2026-06-11 16:28:06,289 - performance_logger - INFO - Replaced aggregator.frame_blocks.6.mlp.fc2 with Real Int torch.int8 Layer
+2026-06-11 16:28:06,290 - performance_logger - INFO - Replaced aggregator.frame_blocks.7.attn.qkv with Real Int torch.int8 Layer
+2026-06-11 16:28:06,290 - performance_logger - INFO - Replaced aggregator.frame_blocks.7.attn.proj with Real Int torch.int8 Layer
+2026-06-11 16:28:06,290 - performance_logger - INFO - Replaced aggregator.frame_blocks.7.mlp.fc1 with Real Int torch.int8 Layer
+2026-06-11 16:28:06,291 - performance_logger - INFO - Replaced aggregator.frame_blocks.7.mlp.fc2 with Real Int torch.int8 Layer
+2026-06-11 16:28:06,291 - performance_logger - INFO - Replaced aggregator.frame_blocks.8.attn.qkv with Real Int torch.int8 Layer
+2026-06-11 16:28:06,291 - performance_logger - INFO - Replaced aggregator.frame_blocks.8.attn.proj with Real Int torch.int8 Layer
+2026-06-11 16:28:06,291 - performance_logger - INFO - Replaced aggregator.frame_blocks.8.mlp.fc1 with Real Int torch.int8 Layer
+2026-06-11 16:28:06,292 - performance_logger - INFO - Replaced aggregator.frame_blocks.8.mlp.fc2 with Real Int torch.int8 Layer
+2026-06-11 16:28:06,292 - performance_logger - INFO - Replaced aggregator.frame_blocks.9.attn.qkv with Real Int torch.int8 Layer
+2026-06-11 16:28:06,292 - performance_logger - INFO - Replaced aggregator.frame_blocks.9.attn.proj with Real Int torch.int8 Layer
+2026-06-11 16:28:06,293 - performance_logger - INFO - Replaced aggregator.frame_blocks.9.mlp.fc1 with Real Int torch.int8 Layer
+2026-06-11 16:28:06,293 - performance_logger - INFO - Replaced aggregator.frame_blocks.9.mlp.fc2 with Real Int torch.int8 Layer
+2026-06-11 16:28:06,293 - performance_logger - INFO - Replaced aggregator.frame_blocks.10.attn.qkv with Real Int torch.int8 Layer
+2026-06-11 16:28:06,293 - performance_logger - INFO - Replaced aggregator.frame_blocks.10.attn.proj with Real Int torch.int8 Layer
+2026-06-11 16:28:06,294 - performance_logger - INFO - Replaced aggregator.frame_blocks.10.mlp.fc1 with Real Int torch.int8 Layer
+2026-06-11 16:28:06,294 - performance_logger - INFO - Replaced aggregator.frame_blocks.10.mlp.fc2 with Real Int torch.int8 Layer
+2026-06-11 16:28:06,294 - performance_logger - INFO - Replaced aggregator.frame_blocks.11.attn.qkv with Real Int torch.int8 Layer
+2026-06-11 16:28:06,295 - performance_logger - INFO - Replaced aggregator.frame_blocks.11.attn.proj with Real Int torch.int8 Layer
+2026-06-11 16:28:06,295 - performance_logger - INFO - Replaced aggregator.frame_blocks.11.mlp.fc1 with Real Int torch.int8 Layer
+2026-06-11 16:28:06,295 - performance_logger - INFO - Replaced aggregator.frame_blocks.11.mlp.fc2 with Real Int torch.int8 Layer
+2026-06-11 16:28:06,295 - performance_logger - INFO - Replaced aggregator.global_blocks.6.attn.qkv with Real Int torch.int8 Layer
+2026-06-11 16:28:06,296 - performance_logger - INFO - Replaced aggregator.global_blocks.6.attn.proj with Real Int torch.int8 Layer
+2026-06-11 16:28:06,296 - performance_logger - INFO - Replaced aggregator.global_blocks.6.mlp.fc1 with Real Int torch.int8 Layer
+2026-06-11 16:28:06,296 - performance_logger - INFO - Replaced aggregator.global_blocks.6.mlp.fc2 with Real Int torch.int8 Layer
+2026-06-11 16:28:06,296 - performance_logger - INFO - Replaced aggregator.global_blocks.7.attn.qkv with Real Int torch.int8 Layer
+2026-06-11 16:28:06,297 - performance_logger - INFO - Replaced aggregator.global_blocks.7.attn.proj with Real Int torch.int8 Layer
+2026-06-11 16:28:06,297 - performance_logger - INFO - Replaced aggregator.global_blocks.7.mlp.fc1 with Real Int torch.int8 Layer
+2026-06-11 16:28:06,297 - performance_logger - INFO - Replaced aggregator.global_blocks.7.mlp.fc2 with Real Int torch.int8 Layer
+2026-06-11 16:28:06,297 - performance_logger - INFO - Replaced aggregator.global_blocks.8.attn.qkv with Real Int torch.int8 Layer
+2026-06-11 16:28:06,298 - performance_logger - INFO - Replaced aggregator.global_blocks.8.attn.proj with Real Int torch.int8 Layer
+2026-06-11 16:28:06,298 - performance_logger - INFO - Replaced aggregator.global_blocks.8.mlp.fc1 with Real Int torch.int8 Layer
+2026-06-11 16:28:06,298 - performance_logger - INFO - Replaced aggregator.global_blocks.8.mlp.fc2 with Real Int torch.int8 Layer
+2026-06-11 16:28:06,298 - performance_logger - INFO - Replaced aggregator.global_blocks.9.attn.qkv with Real Int torch.int8 Layer
+2026-06-11 16:28:06,299 - performance_logger - INFO - Replaced aggregator.global_blocks.9.attn.proj with Real Int torch.int8 Layer
+2026-06-11 16:28:06,299 - performance_logger - INFO - Replaced aggregator.global_blocks.9.mlp.fc1 with Real Int torch.int8 Layer
+2026-06-11 16:28:06,299 - performance_logger - INFO - Replaced aggregator.global_blocks.9.mlp.fc2 with Real Int torch.int8 Layer
+2026-06-11 16:28:06,300 - performance_logger - INFO - Replaced aggregator.global_blocks.10.attn.qkv with Real Int torch.int8 Layer
+2026-06-11 16:28:06,300 - performance_logger - INFO - Replaced aggregator.global_blocks.10.attn.proj with Real Int torch.int8 Layer
+2026-06-11 16:28:06,300 - performance_logger - INFO - Replaced aggregator.global_blocks.10.mlp.fc1 with Real Int torch.int8 Layer
+2026-06-11 16:28:06,301 - performance_logger - INFO - Replaced aggregator.global_blocks.10.mlp.fc2 with Real Int torch.int8 Layer
+2026-06-11 16:28:06,301 - performance_logger - INFO - Replaced aggregator.global_blocks.11.attn.qkv with Real Int torch.int8 Layer
+2026-06-11 16:28:06,301 - performance_logger - INFO - Replaced aggregator.global_blocks.11.attn.proj with Real Int torch.int8 Layer
+2026-06-11 16:28:06,301 - performance_logger - INFO - Replaced aggregator.global_blocks.11.mlp.fc1 with Real Int torch.int8 Layer
+2026-06-11 16:28:06,302 - performance_logger - INFO - Replaced aggregator.global_blocks.11.mlp.fc2 with Real Int torch.int8 Layer
+2026-06-11 18:44:21,376 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:05,563 - performance_logger - INFO - Packing model to REAL integer weights...
+2026-06-11 16:59:05,879 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:05,922 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:05,934 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:05,940 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:05,946 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:05,951 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:05,955 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:05,962 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:05,968 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:05,972 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:05,978 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:05,988 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:05,995 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:05,999 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,009 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,017 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,025 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,029 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,035 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,040 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,048 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,052 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,058 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,066 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,073 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,078 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,084 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,089 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,095 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,099 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,108 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,114 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,119 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,123 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,128 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,134 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,139 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,143 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,149 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,155 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,161 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,165 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,173 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,179 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,185 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,189 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,192 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,197 - performance_logger - INFO - Enabled W4A4 for layer
+2026-06-11 16:59:06,204 - performance_logger - INFO - Replaced aggregator.frame_blocks.6.attn.qkv with Real Int Packed4 Layer
+2026-06-11 16:59:06,204 - performance_logger - INFO - Replaced aggregator.frame_blocks.6.attn.proj with Real Int Packed4 Layer
+2026-06-11 16:59:06,204 - performance_logger - INFO - Replaced aggregator.frame_blocks.6.mlp.fc1 with Real Int Packed4 Layer
+2026-06-11 16:59:06,204 - performance_logger - INFO - Replaced aggregator.frame_blocks.6.mlp.fc2 with Real Int Packed4 Layer
+2026-06-11 16:59:06,205 - performance_logger - INFO - Replaced aggregator.frame_blocks.7.attn.qkv with Real Int Packed4 Layer
+2026-06-11 16:59:06,205 - performance_logger - INFO - Replaced aggregator.frame_blocks.7.attn.proj with Real Int Packed4 Layer
+2026-06-11 16:59:06,205 - performance_logger - INFO - Replaced aggregator.frame_blocks.7.mlp.fc1 with Real Int Packed4 Layer
+2026-06-11 16:59:06,205 - performance_logger - INFO - Replaced aggregator.frame_blocks.7.mlp.fc2 with Real Int Packed4 Layer
+2026-06-11 16:59:06,206 - performance_logger - INFO - Replaced aggregator.frame_blocks.8.attn.qkv with Real Int Packed4 Layer
+2026-06-11 16:59:06,206 - performance_logger - INFO - Replaced aggregator.frame_blocks.8.attn.proj with Real Int Packed4 Layer
+2026-06-11 16:59:06,206 - performance_logger - INFO - Replaced aggregator.frame_blocks.8.mlp.fc1 with Real Int Packed4 Layer
+2026-06-11 16:59:06,206 - performance_logger - INFO - Replaced aggregator.frame_blocks.8.mlp.fc2 with Real Int Packed4 Layer
+2026-06-11 16:59:06,207 - performance_logger - INFO - Replaced aggregator.frame_blocks.9.attn.qkv with Real Int Packed4 Layer
+2026-06-11 16:59:06,207 - performance_logger - INFO - Replaced aggregator.frame_blocks.9.attn.proj with Real Int Packed4 Layer
+2026-06-11 16:59:06,207 - performance_logger - INFO - Replaced aggregator.frame_blocks.9.mlp.fc1 with Real Int Packed4 Layer
+2026-06-11 16:59:06,207 - performance_logger - INFO - Replaced aggregator.frame_blocks.9.mlp.fc2 with Real Int Packed4 Layer
+2026-06-11 16:59:06,208 - performance_logger - INFO - Replaced aggregator.frame_blocks.10.attn.qkv with Real Int Packed4 Layer
+2026-06-11 16:59:06,208 - performance_logger - INFO - Replaced aggregator.frame_blocks.10.attn.proj with Real Int Packed4 Layer
+2026-06-11 16:59:06,208 - performance_logger - INFO - Replaced aggregator.frame_blocks.10.mlp.fc1 with Real Int Packed4 Layer
+2026-06-11 16:59:06,208 - performance_logger - INFO - Replaced aggregator.frame_blocks.10.mlp.fc2 with Real Int Packed4 Layer
+2026-06-11 16:59:06,208 - performance_logger - INFO - Replaced aggregator.frame_blocks.11.attn.qkv with Real Int Packed4 Layer
+2026-06-11 16:59:06,209 - performance_logger - INFO - Replaced aggregator.frame_blocks.11.attn.proj with Real Int Packed4 Layer
+2026-06-11 16:59:06,209 - performance_logger - INFO - Replaced aggregator.frame_blocks.11.mlp.fc1 with Real Int Packed4 Layer
+2026-06-11 16:59:06,209 - performance_logger - INFO - Replaced aggregator.frame_blocks.11.mlp.fc2 with Real Int Packed4 Layer
+2026-06-11 16:59:06,209 - performance_logger - INFO - Replaced aggregator.global_blocks.6.attn.qkv with Real Int Packed4 Layer
+2026-06-11 16:59:06,209 - performance_logger - INFO - Replaced aggregator.global_blocks.6.attn.proj with Real Int Packed4 Layer
+2026-06-11 16:59:06,210 - performance_logger - INFO - Replaced aggregator.global_blocks.6.mlp.fc1 with Real Int Packed4 Layer
+2026-06-11 16:59:06,210 - performance_logger - INFO - Replaced aggregator.global_blocks.6.mlp.fc2 with Real Int Packed4 Layer
+2026-06-11 16:59:06,211 - performance_logger - INFO - Replaced aggregator.global_blocks.7.attn.qkv with Real Int Packed4 Layer
+2026-06-11 16:59:06,211 - performance_logger - INFO - Replaced aggregator.global_blocks.7.attn.proj with Real Int Packed4 Layer
+2026-06-11 16:59:06,211 - performance_logger - INFO - Replaced aggregator.global_blocks.7.mlp.fc1 with Real Int Packed4 Layer
+2026-06-11 16:59:06,211 - performance_logger - INFO - Replaced aggregator.global_blocks.7.mlp.fc2 with Real Int Packed4 Layer
+2026-06-11 16:59:06,211 - performance_logger - INFO - Replaced aggregator.global_blocks.8.attn.qkv with Real Int Packed4 Layer
+2026-06-11 16:59:06,212 - performance_logger - INFO - Replaced aggregator.global_blocks.8.attn.proj with Real Int Packed4 Layer
+2026-06-11 16:59:06,212 - performance_logger - INFO - Replaced aggregator.global_blocks.8.mlp.fc1 with Real Int Packed4 Layer
+2026-06-11 16:59:06,212 - performance_logger - INFO - Replaced aggregator.global_blocks.8.mlp.fc2 with Real Int Packed4 Layer
+2026-06-11 16:59:06,212 - performance_logger - INFO - Replaced aggregator.global_blocks.9.attn.qkv with Real Int Packed4 Layer
+2026-06-11 16:59:06,213 - performance_logger - INFO - Replaced aggregator.global_blocks.9.attn.proj with Real Int Packed4 Layer
+2026-06-11 16:59:06,213 - performance_logger - INFO - Replaced aggregator.global_blocks.9.mlp.fc1 with Real Int Packed4 Layer
+2026-06-11 16:59:06,213 - performance_logger - INFO - Replaced aggregator.global_blocks.9.mlp.fc2 with Real Int Packed4 Layer
+2026-06-11 16:59:06,213 - performance_logger - INFO - Replaced aggregator.global_blocks.10.attn.qkv with Real Int Packed4 Layer
+2026-06-11 16:59:06,213 - performance_logger - INFO - Replaced aggregator.global_blocks.10.attn.proj with Real Int Packed4 Layer
+2026-06-11 16:59:06,214 - performance_logger - INFO - Replaced aggregator.global_blocks.10.mlp.fc1 with Real Int Packed4 Layer
+2026-06-11 16:59:06,214 - performance_logger - INFO - Replaced aggregator.global_blocks.10.mlp.fc2 with Real Int Packed4 Layer
+2026-06-11 16:59:06,214 - performance_logger - INFO - Replaced aggregator.global_blocks.11.attn.qkv with Real Int Packed4 Layer
+2026-06-11 16:59:06,214 - performance_logger - INFO - Replaced aggregator.global_blocks.11.attn.proj with Real Int Packed4 Layer
+2026-06-11 16:59:06,215 - performance_logger - INFO - Replaced aggregator.global_blocks.11.mlp.fc1 with Real Int Packed4 Layer
+2026-06-11 16:59:06,215 - performance_logger - INFO - Replaced aggregator.global_blocks.11.mlp.fc2 with Real Int Packed4 Layer

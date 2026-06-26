@@ -168,6 +168,11 @@ def _load_model(checkpoint_path: str, dtype: torch.dtype, device: str) -> nn.Mod
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--checkpoint", default=DEFAULT_CKPT)
+    p.add_argument("--categories", default=None,
+                   help="comma-separated category list for a fast estimate, e.g. 'apple'.")
+    p.add_argument("--max_seqs", type=int, default=None,
+                   help="cap sequences per category (e.g. 5) for a quick run.")
+    p.add_argument("--results", default=None, help="output JSON path")
     args = p.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -176,7 +181,9 @@ def main():
     logger.info(f"Device: {device}  |  SM{torch.cuda.get_device_capability()[0]}.x  |  dtype: {dtype}")
 
     model = _load_model(args.checkpoint, dtype, device)
-    run_evaluation_vggt(model)
+    categories = [c.strip() for c in args.categories.split(",")] if args.categories else None
+    run_evaluation_vggt(model, categories=categories, max_seqs=args.max_seqs,
+                        results_path=args.results)
 
 
 if __name__ == "__main__":

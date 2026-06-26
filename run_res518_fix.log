@@ -1,0 +1,289 @@
+=== [01:55:13] FIX: Waiting for first pass (run_res518.sh) to finish ... ===
+=== [02:21:14] FIX: First pass done. Rebuilding missing engines on a free GPU (opt level 0). ===
+=== [02:21:14] FIX: engine chain_modelopt_max_pc_518x518_s0 exists -> skip ===
+=== [02:21:14] FIX: engine chain_modelopt_max_pc_518x518_s8 exists -> skip ===
+fp16 conversion: 288 initializers, 161 constants, 128 Cast targets → fp16; I/O set to fp16. Wrote deploy/artifacts/onnx/chain_modelopt_max_pc_518x518_s16_fp16/chain_modelopt_max_pc_518x518_s16_fp16.onnx
+=== [02:21:19] FIX: robust trtexec build chain_modelopt_max_pc_518x518_s16 (opt0, ws1024) ===
+=== [02:21:55] FIX: engine chain_f10_518_s0 exists -> skip ===
+=== [02:21:55] FIX: engine chain_f10_518_s8 exists -> skip ===
+=== [02:21:55] FIX: engine chain_f10_518_s16 exists -> skip ===
+=== [02:21:55] FIX: engine dino_0_nofuse_518 exists -> skip ===
+=== [02:21:55] FIX: engine dino_1_nofuse_518 exists -> skip ===
+=== [02:21:55] FIX: engine camera_head_518 exists -> skip ===
+=== [02:21:55] FIX: Config 4: Hybrid INT8 @518 (re-eval) ===
+2026-06-26 02:22:02,713 - src_logger - INFO - [TRT INT8 chain ModelOpt (max,pc_518x518)] evaluating 3-engine chain → /workspace/scripts/../deploy/artifacts/results/eval_results_trt_modelopt_pc_max_518x518.json
+2026-06-26 02:22:11,226 - src_logger - INFO - Pre-allocating model pool: 2700 MB (kept alive) ...
+2026-06-26 02:22:12,057 - src_logger - INFO - Pre-allocating activation pool: 1600 MB (separate NvMap segments — model pool still alive) ...
+2026-06-26 02:22:12,811 - src_logger - INFO - Pools ready: model 2700 MB + activation 1600 MB  | CUDA free: 1689 MB
+2026-06-26 02:22:14,294 - src_logger - INFO - Streaming checkpoint (torch.float16) from data3/rogelio/model_zoo/vggt/vggt_1B_commercial.pt ...
+2026-06-26 02:23:31,373 - src_logger - INFO - Loaded — missing: 0, unexpected: 0
+2026-06-26 02:23:34,095 - src_logger - INFO - Activation pool released: 1600 MB contiguous free for inference  | CUDA allocated: 2397 MB
+NvMap defrag: reserved+freed 2049 MB contiguous before engine load.
+TRT engine loaded: /workspace/scripts/../deploy/artifacts/engines/chain_modelopt_max_pc_518x518_s0.trt
+  Inputs:  ['tokens']
+  Outputs: ['tokens_out']
+TRT engine loaded: /workspace/scripts/../deploy/artifacts/engines/chain_modelopt_max_pc_518x518_s8.trt
+  Inputs:  ['tokens']
+  Outputs: ['tokens_out']
+NvMapMemAllocInternalTagged: 1075072515 error 12
+NvMapMemHandleAlloc: error 0
+NvMapMemAllocInternalTagged: 1075072515 error 12
+NvMapMemHandleAlloc: error 0
+[06/26/2026-02:23:38] [TRT] [E] [defaultAllocator.cpp::allocate::31] Error Code 1: Cuda Runtime (out of memory)
+[06/26/2026-02:23:38] [TRT] [W] Requested amount of GPU memory (790724608 bytes) could not be allocated. There may not be enough free memory for allocation to succeed.
+[06/26/2026-02:23:38] [TRT] [E] [executionContext.cpp::ExecutionContext::565] Error Code 2: OutOfMemory (Requested size was 790724608 bytes.)
+TRT engine loaded: /workspace/scripts/../deploy/artifacts/engines/chain_modelopt_max_pc_518x518_s16.trt
+  Inputs:  ['tokens']
+  Outputs: ['last_tokens']
+TRT chain: 3 sub-engines (['chain_modelopt_max_pc_518x518_s0.trt', 'chain_modelopt_max_pc_518x518_s8.trt', 'chain_modelopt_max_pc_518x518_s16.trt'])
+2026-06-26 02:23:38,554 - src_logger - INFO - [Jetson] Detected 7.4 GB VRAM — using DPT frames_chunk_size=2 (vs default 8) to fit 10-frame activations in unified memory.
+2026-06-26 02:23:38,557 - src_logger - INFO - Evaluation dtype: torch.float16 (Jetson 7.4 GB — matching model dtype, avoids BF16 cast overhead)
+2026-06-26 02:23:38,571 - src_logger - INFO - Model weight memory: 993 MB
+2026-06-26 02:23:38,572 - src_logger - INFO - Warming up CUDA kernels (1 synthetic forward pass) ...
+Traceback (most recent call last):
+  File "/workspace/scripts/bench_trt_modelopt_chain.py", line 111, in <module>
+    main()
+  File "/workspace/scripts/bench_trt_modelopt_chain.py", line 102, in main
+    C.eval_chain(engines, results,
+  File "/workspace/scripts/_trt_bench_common.py", line 237, in eval_chain
+    run_evaluation_vggt(model, model_path=label, results_path=results_path,
+  File "/workspace/scripts/../deploy/runtime/../../src/models/depth/qvggt.py", line 85, in run_evaluation_vggt
+    model(_dummy, frames_chunk_size=frames_chunk_size)
+  File "/usr/local/lib/python3.10/dist-packages/torch/nn/modules/module.py", line 1751, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/usr/local/lib/python3.10/dist-packages/torch/nn/modules/module.py", line 1762, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/scripts/../deploy/runtime/trt_inference.py", line 391, in forward
+    last = self.engines[-1].infer({"tokens": tokens})[self._out_names[-1]]
+  File "/workspace/scripts/../deploy/runtime/trt_inference.py", line 196, in infer
+    self.context.set_input_shape(name, shape)
+AttributeError: 'NoneType' object has no attribute 'set_input_shape'
+=== [02:23:49] FIX: config4 re-eval FAILED ===
+=== [02:23:49] FIX: Config 2: Hybrid fp16 @518 (re-eval) ===
+2026-06-26 02:23:55,722 - src_logger - INFO - [Hybrid TRT fp16 @518] evaluating 3-engine chain → /workspace/scripts/../deploy/artifacts/results/eval_results_trt_chain_fp16_518.json
+2026-06-26 02:24:04,236 - src_logger - INFO - Pre-allocating model pool: 2700 MB (kept alive) ...
+2026-06-26 02:24:05,068 - src_logger - INFO - Pre-allocating activation pool: 1600 MB (separate NvMap segments — model pool still alive) ...
+2026-06-26 02:24:05,817 - src_logger - INFO - Pools ready: model 2700 MB + activation 1600 MB  | CUDA free: 1818 MB
+2026-06-26 02:24:07,297 - src_logger - INFO - Streaming checkpoint (torch.float16) from data3/rogelio/model_zoo/vggt/vggt_1B_commercial.pt ...
+2026-06-26 02:25:20,288 - src_logger - INFO - Loaded — missing: 0, unexpected: 0
+2026-06-26 02:25:23,080 - src_logger - INFO - Activation pool released: 1600 MB contiguous free for inference  | CUDA allocated: 2397 MB
+NvMap defrag: reserved+freed 2195 MB contiguous before engine load.
+TRT engine loaded: /workspace/scripts/../deploy/artifacts/engines/chain_f10_518_s0.trt
+  Inputs:  ['tokens']
+  Outputs: ['tokens_out']
+TRT engine loaded: /workspace/scripts/../deploy/artifacts/engines/chain_f10_518_s8.trt
+  Inputs:  ['tokens']
+  Outputs: ['tokens_out']
+NvMapMemAllocInternalTagged: 1075072515 error 12
+NvMapMemHandleAlloc: error 0
+TRT engine loaded: /workspace/scripts/../deploy/artifacts/engines/chain_f10_518_s16.trt
+  Inputs:  ['tokens']
+  Outputs: ['last_tokens']
+TRT chain: 3 sub-engines (['chain_f10_518_s0.trt', 'chain_f10_518_s8.trt', 'chain_f10_518_s16.trt'])
+2026-06-26 02:25:27,450 - src_logger - INFO - [Jetson] Detected 7.4 GB VRAM — using DPT frames_chunk_size=2 (vs default 8) to fit 10-frame activations in unified memory.
+2026-06-26 02:25:27,452 - src_logger - INFO - Evaluation dtype: torch.float16 (Jetson 7.4 GB — matching model dtype, avoids BF16 cast overhead)
+2026-06-26 02:25:27,466 - src_logger - INFO - Model weight memory: 993 MB
+2026-06-26 02:25:27,466 - src_logger - INFO - Warming up CUDA kernels (1 synthetic forward pass) ...
+NvMapMemAllocInternalTagged: 1075072515 error 12
+NvMapMemHandleAlloc: error 0
+NvMapMemAllocInternalTagged: 1075072515 error 12
+NvMapMemHandleAlloc: error 0
+2026-06-26 02:25:37,259 - src_logger - INFO - Warmup done. Resetting peak memory stats — timing starts now.
+2026-06-26 02:25:37,260 - src_logger - INFO - Restricting evaluation to categories: ['apple']
+2026-06-26 02:25:37,260 - src_logger - INFO - Capping evaluation to 2 sequence(s) per category
+2026-06-26 02:25:37,260 - src_logger - INFO - Loading annotation for apple test set
+2026-06-26 02:25:37,419 - src_logger - INFO - Testing Sequences: 
+2026-06-26 02:25:37,420 - src_logger - INFO - ['110_13051_23361', '12_104_640']
+2026-06-26 02:25:37,420 - src_logger - INFO - --------------------------------------------------
+2026-06-26 02:25:37,420 - src_logger - INFO - Processing 110_13051_23361 for apple test set
+Image ids [ 18 171 107  98 178 183   5 146  12 152]
+[mem] before forward: 1.08 GB allocated, 1.23 GB reserved
+/workspace/scripts/../deploy/runtime/../../src/models/depth/vggt/evaluation/test_co3d.py:335: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with torch.cuda.amp.autocast(dtype=torch.float64):
+/workspace/scripts/../deploy/runtime/../../src/models/depth/vggt/evaluation/test_co3d.py:339: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with torch.cuda.amp.autocast(dtype=torch.float64):
+apple sequence 110_13051_23361 R_ACC@5: 0.9111
+apple sequence 110_13051_23361 T_ACC@5: 0.7333
+2026-06-26 02:25:46,823 - src_logger - INFO -   time=9.4s  peak_cuda=1129MB  activations=136MB
+2026-06-26 02:25:46,823 - src_logger - INFO - --------------------------------------------------
+2026-06-26 02:25:46,823 - src_logger - INFO - --------------------------------------------------
+2026-06-26 02:25:46,824 - src_logger - INFO - Processing 12_104_640 for apple test set
+Image ids [110  47 115  78 150 132  40  52  54  57]
+[mem] before forward: 1.08 GB allocated, 1.23 GB reserved
+apple sequence 12_104_640 R_ACC@5: 1.0000
+apple sequence 12_104_640 T_ACC@5: 0.3778
+2026-06-26 02:25:56,067 - src_logger - INFO -   time=9.2s  peak_cuda=1129MB  activations=136MB
+2026-06-26 02:25:56,067 - src_logger - INFO - --------------------------------------------------
+2026-06-26 02:25:56,071 - src_logger - INFO - ================================================================================
+2026-06-26 02:25:56,071 - src_logger - INFO - [1m[94mAUC of apple test set:[0m [92m0.8133 (AUC@30), 0.6674 (AUC@15), 0.2356 (AUC@5), 0.0889 (AUC@3)[0m
+2026-06-26 02:25:56,071 - src_logger - INFO - [1m[94mMean AUC of categories by now:[0m [91m0.8133 (AUC@30), 0.6674 (AUC@15), 0.2356 (AUC@5), 0.0889 (AUC@3)[0m
+2026-06-26 02:25:56,072 - src_logger - INFO - ================================================================================
+2026-06-26 02:25:56,072 - src_logger - INFO - 
+Summary of AUC results:
+2026-06-26 02:25:56,072 - src_logger - INFO - --------------------------------------------------
+2026-06-26 02:25:56,072 - src_logger - INFO - apple          : 0.8133 (AUC@30), 0.6674 (AUC@15), 0.2356 (AUC@5), 0.0889 (AUC@3)
+2026-06-26 02:25:56,073 - src_logger - INFO - --------------------------------------------------
+2026-06-26 02:25:56,073 - src_logger - INFO - Mean AUC: 0.8133 (AUC@30), 0.6674 (AUC@15), 0.2356 (AUC@5), 0.0889 (AUC@3)
+2026-06-26 02:25:56,073 - src_logger - INFO - ==================================================
+2026-06-26 02:25:56,073 - src_logger - INFO - Performance summary (2 sequences, after warmup):
+2026-06-26 02:25:56,073 - src_logger - INFO -   Model weights:    993 MB
+2026-06-26 02:25:56,075 - src_logger - INFO -   Per-sequence latency:  mean=9.3s  std=0.1s  min=9.2s  max=9.4s
+2026-06-26 02:25:56,075 - src_logger - INFO -   Latency percentiles:   p50=9.3s  p90=9.4s  p99=9.4s
+2026-06-26 02:25:56,075 - src_logger - INFO -   Total wall time: 0.3 min
+2026-06-26 02:25:56,076 - src_logger - INFO -   Peak CUDA (last seq): allocated=1129 MB  reserved=1170 MB
+2026-06-26 02:25:56,079 - src_logger - INFO - Results saved to /workspace/scripts/../deploy/artifacts/results/eval_results_trt_chain_fp16_518.json
+2026-06-26 02:25:56,476 - src_logger - INFO - [Hybrid TRT fp16 @518] AUC@30=0.813333333333333  engines=3 total=1172.0MB
+=== [02:25:59] FIX: Config 5: Full INT8 @518 (re-eval, memory-risky) ===
+2026-06-26 02:26:06,114 - src_logger - INFO - [Full TRT INT8 @518] evaluating 6-engine all-TRT path → deploy/artifacts/results/eval_results_trt_fulltrt_int8_518.json
+NvMap defrag: reserved+freed 2798 MB before engine load.
+TRT engine loaded: /workspace/scripts/../deploy/artifacts/engines/dino_0_nofuse_518.trt
+  Inputs:  ['images']
+  Outputs: ['hidden_out']
+TRT engine loaded: /workspace/scripts/../deploy/artifacts/engines/dino_1_nofuse_518.trt
+  Inputs:  ['hidden_in']
+  Outputs: ['tokens']
+TRT engine loaded: /workspace/scripts/../deploy/artifacts/engines/chain_modelopt_max_pc_518x518_s0.trt
+  Inputs:  ['tokens']
+  Outputs: ['tokens_out']
+TRT engine loaded: /workspace/scripts/../deploy/artifacts/engines/chain_modelopt_max_pc_518x518_s8.trt
+  Inputs:  ['tokens']
+  Outputs: ['tokens_out']
+TRT engine loaded: /workspace/scripts/../deploy/artifacts/engines/chain_modelopt_max_pc_518x518_s16.trt
+  Inputs:  ['tokens']
+  Outputs: ['last_tokens']
+TRT engine loaded: /workspace/scripts/../deploy/artifacts/engines/camera_head_518.trt
+  Inputs:  ['last_tokens']
+  Outputs: ['pose_enc']
+TRT all-engine chain: 6 engines, shared scratch 754 MB (['dino_0_nofuse_518.trt', 'dino_1_nofuse_518.trt', 'chain_modelopt_max_pc_518x518_s0.trt', 'chain_modelopt_max_pc_518x518_s8.trt', 'chain_modelopt_max_pc_518x518_s16.trt', 'camera_head_518.trt'])
+2026-06-26 02:26:11,238 - src_logger - INFO - [Jetson] Detected 7.4 GB VRAM — using DPT frames_chunk_size=2 (vs default 8) to fit 10-frame activations in unified memory.
+2026-06-26 02:26:11,238 - src_logger - INFO - Evaluation dtype: torch.float16 (Jetson 7.4 GB — matching model dtype, avoids BF16 cast overhead)
+2026-06-26 02:26:11,241 - src_logger - INFO - Model weight memory: 0 MB
+2026-06-26 02:26:11,241 - src_logger - INFO - Warming up CUDA kernels (1 synthetic forward pass) ...
+NvMapMemAllocInternalTagged: 1075072515 error 12
+NvMapMemHandleAlloc: error 0
+NvMapMemAllocInternalTagged: 1075072515 error 12
+NvMapMemHandleAlloc: error 0
+2026-06-26 02:26:25,101 - src_logger - INFO - Warmup done. Resetting peak memory stats — timing starts now.
+2026-06-26 02:26:25,104 - src_logger - INFO - Restricting evaluation to categories: ['apple']
+2026-06-26 02:26:25,104 - src_logger - INFO - Capping evaluation to 2 sequence(s) per category
+2026-06-26 02:26:25,104 - src_logger - INFO - Loading annotation for apple test set
+2026-06-26 02:26:25,496 - src_logger - INFO - Testing Sequences: 
+2026-06-26 02:26:25,496 - src_logger - INFO - ['110_13051_23361', '12_104_640']
+2026-06-26 02:26:25,496 - src_logger - INFO - --------------------------------------------------
+2026-06-26 02:26:25,497 - src_logger - INFO - Processing 110_13051_23361 for apple test set
+Image ids [ 18 171 107  98 178 183   5 146  12 152]
+[mem] before forward: 0.03 GB allocated, 0.04 GB reserved
+/workspace/scripts/../deploy/runtime/../../src/models/depth/vggt/evaluation/test_co3d.py:335: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with torch.cuda.amp.autocast(dtype=torch.float64):
+/workspace/scripts/../deploy/runtime/../../src/models/depth/vggt/evaluation/test_co3d.py:339: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with torch.cuda.amp.autocast(dtype=torch.float64):
+apple sequence 110_13051_23361 R_ACC@5: 0.9333
+apple sequence 110_13051_23361 T_ACC@5: 0.7111
+2026-06-26 02:26:39,480 - src_logger - INFO -   time=14.0s  peak_cuda=46MB  activations=46MB
+2026-06-26 02:26:39,480 - src_logger - INFO - --------------------------------------------------
+2026-06-26 02:26:39,480 - src_logger - INFO - --------------------------------------------------
+2026-06-26 02:26:39,480 - src_logger - INFO - Processing 12_104_640 for apple test set
+Image ids [110  47 115  78 150 132  40  52  54  57]
+[mem] before forward: 0.04 GB allocated, 0.07 GB reserved
+apple sequence 12_104_640 R_ACC@5: 1.0000
+apple sequence 12_104_640 T_ACC@5: 0.3556
+2026-06-26 02:26:53,141 - src_logger - INFO -   time=13.7s  peak_cuda=54MB  activations=54MB
+2026-06-26 02:26:53,141 - src_logger - INFO - --------------------------------------------------
+2026-06-26 02:26:53,145 - src_logger - INFO - ================================================================================
+2026-06-26 02:26:53,145 - src_logger - INFO - [1m[94mAUC of apple test set:[0m [92m0.8115 (AUC@30), 0.6630 (AUC@15), 0.2156 (AUC@5), 0.0667 (AUC@3)[0m
+2026-06-26 02:26:53,146 - src_logger - INFO - [1m[94mMean AUC of categories by now:[0m [91m0.8115 (AUC@30), 0.6630 (AUC@15), 0.2156 (AUC@5), 0.0667 (AUC@3)[0m
+2026-06-26 02:26:53,146 - src_logger - INFO - ================================================================================
+2026-06-26 02:26:53,146 - src_logger - INFO - 
+Summary of AUC results:
+2026-06-26 02:26:53,146 - src_logger - INFO - --------------------------------------------------
+2026-06-26 02:26:53,146 - src_logger - INFO - apple          : 0.8115 (AUC@30), 0.6630 (AUC@15), 0.2156 (AUC@5), 0.0667 (AUC@3)
+2026-06-26 02:26:53,147 - src_logger - INFO - --------------------------------------------------
+2026-06-26 02:26:53,147 - src_logger - INFO - Mean AUC: 0.8115 (AUC@30), 0.6630 (AUC@15), 0.2156 (AUC@5), 0.0667 (AUC@3)
+2026-06-26 02:26:53,147 - src_logger - INFO - ==================================================
+2026-06-26 02:26:53,147 - src_logger - INFO - Performance summary (2 sequences, after warmup):
+2026-06-26 02:26:53,147 - src_logger - INFO -   Model weights:    0 MB
+2026-06-26 02:26:53,149 - src_logger - INFO -   Per-sequence latency:  mean=13.8s  std=0.2s  min=13.7s  max=14.0s
+2026-06-26 02:26:53,150 - src_logger - INFO -   Latency percentiles:   p50=13.8s  p90=14.0s  p99=14.0s
+2026-06-26 02:26:53,150 - src_logger - INFO -   Total wall time: 0.5 min
+2026-06-26 02:26:53,151 - src_logger - INFO -   Peak CUDA (last seq): allocated=54 MB  reserved=62 MB
+2026-06-26 02:26:53,154 - src_logger - INFO - Results saved to deploy/artifacts/results/eval_results_trt_fulltrt_int8_518.json
+2026-06-26 02:26:53,746 - src_logger - INFO - [Full TRT INT8 @518] AUC@30=0.8114814814814811  engines=6 total=2030.2MB
+=== [02:26:55] FIX: Config 3: Full fp16 @518 (re-eval, memory-risky) ===
+2026-06-26 02:27:01,641 - src_logger - INFO - [Full TRT fp16 @518] evaluating 6-engine all-TRT path → deploy/artifacts/results/eval_results_trt_fulltrt_fp16_518.json
+NvMap defrag: reserved+freed 2944 MB before engine load.
+TRT engine loaded: /workspace/scripts/../deploy/artifacts/engines/dino_0_nofuse_518.trt
+  Inputs:  ['images']
+  Outputs: ['hidden_out']
+TRT engine loaded: /workspace/scripts/../deploy/artifacts/engines/dino_1_nofuse_518.trt
+  Inputs:  ['hidden_in']
+  Outputs: ['tokens']
+TRT engine loaded: /workspace/scripts/../deploy/artifacts/engines/chain_f10_518_s0.trt
+  Inputs:  ['tokens']
+  Outputs: ['tokens_out']
+TRT engine loaded: /workspace/scripts/../deploy/artifacts/engines/chain_f10_518_s8.trt
+  Inputs:  ['tokens']
+  Outputs: ['tokens_out']
+TRT engine loaded: /workspace/scripts/../deploy/artifacts/engines/chain_f10_518_s16.trt
+  Inputs:  ['tokens']
+  Outputs: ['last_tokens']
+TRT engine loaded: /workspace/scripts/../deploy/artifacts/engines/camera_head_518.trt
+  Inputs:  ['last_tokens']
+  Outputs: ['pose_enc']
+TRT all-engine chain: 6 engines, shared scratch 295 MB (['dino_0_nofuse_518.trt', 'dino_1_nofuse_518.trt', 'chain_f10_518_s0.trt', 'chain_f10_518_s8.trt', 'chain_f10_518_s16.trt', 'camera_head_518.trt'])
+2026-06-26 02:27:06,870 - src_logger - INFO - [Jetson] Detected 7.4 GB VRAM — using DPT frames_chunk_size=2 (vs default 8) to fit 10-frame activations in unified memory.
+2026-06-26 02:27:06,871 - src_logger - INFO - Evaluation dtype: torch.float16 (Jetson 7.4 GB — matching model dtype, avoids BF16 cast overhead)
+2026-06-26 02:27:06,877 - src_logger - INFO - Model weight memory: 0 MB
+2026-06-26 02:27:06,877 - src_logger - INFO - Warming up CUDA kernels (1 synthetic forward pass) ...
+NvMapMemAllocInternalTagged: 1075072515 error 12
+NvMapMemHandleAlloc: error 0
+NvMapMemAllocInternalTagged: 1075072515 error 12
+NvMapMemHandleAlloc: error 0
+NvMapMemAllocInternalTagged: 1075072515 error 12
+NvMapMemHandleAlloc: error 0
+NvMapMemAllocInternalTagged: 1075072515 error 12
+NvMapMemHandleAlloc: error 0
+NvMapMemAllocInternalTagged: 1075072515 error 12
+NvMapMemHandleAlloc: error 0
+Traceback (most recent call last):
+  File "/workspace/scripts/bench_trt_fulltrt.py", line 63, in <module>
+    main()
+  File "/workspace/scripts/bench_trt_fulltrt.py", line 57, in main
+    C.eval_all_engines(engine_paths, results, label=args.label,
+  File "/workspace/scripts/_trt_bench_common.py", line 138, in eval_all_engines
+    run_evaluation_vggt(model, model_path=label, results_path=results_path,
+  File "/workspace/scripts/../deploy/runtime/../../src/models/depth/qvggt.py", line 85, in run_evaluation_vggt
+    model(_dummy, frames_chunk_size=frames_chunk_size)
+  File "/usr/local/lib/python3.10/dist-packages/torch/nn/modules/module.py", line 1751, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/usr/local/lib/python3.10/dist-packages/torch/nn/modules/module.py", line 1762, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/scripts/../deploy/runtime/trt_inference.py", line 510, in forward
+    x = eng.infer({in_name: x})[out_name]   # numpy host array, fed straight on
+  File "/workspace/scripts/../deploy/runtime/trt_inference.py", line 213, in infer
+    self._alloc_buffer(name, out_shape)
+  File "/workspace/scripts/../deploy/runtime/trt_inference.py", line 171, in _alloc_buffer
+    device = cuda.mem_alloc(nbytes)
+pycuda._driver.MemoryError: cuMemAlloc failed: out of memory
+=== [02:27:15] FIX: config3 re-eval FAILED ===
+=== [02:27:15] FIX: Aggregating final comparison ===
+# VGGT TensorRT comparison (pose-only, Jetson Orin Nano)
+
+Memory = TRT engine size for TRT rows, weight memory for PyTorch rows. Speedup/Mem× are vs the PyTorch FP16 baseline. GPU (ms) is trtexec `--noDataTransfers` pure compute (TRT rows only).
+
+| Approach | Prec | Mem (MB) | Latency (ms/seq) | p90 (ms) | p99 (ms) | GPU (ms) | AUC@30 | Speedup× | Mem× |
+|---|---|---|---|---|---|---|---|---|---|
+| PyTorch FP16 (baseline) | fp16 | 2396 | 15232.3 | 15362.5 | 15391.8 | — | 0.8126 | 1.0 | 1.0 |
+| eval_results_chain_cmp_apple2.json | ? | 1171.6 | 6166.9 | 6313.3 | 6346.2 | — | 0.653 | 2.47 | 2.05 |
+| eval_results_chain_f10_c8.json | ? | 1171.6 | 6133.5 | 6199.9 | 6214.9 | — | 0.653 | 2.48 | 2.05 |
+| eval_results_pose_only.json | ? | 2146 | 12904.2 | 13131.8 | 13183.1 | — | 0.8144 | 1.18 | 1.12 |
+| eval_results_torch_350x518.json | ? | 2146 | 8549.0 | 8677.1 | 8705.9 | — | 0.6537 | 1.78 | 1.12 |
+| eval_results_torch_518x518.json | ? | 2146 | 12670.6 | 12758.3 | 12778.1 | — | 0.8126 | 1.2 | 1.12 |
+| eval_results_trt_chain_fp16_518.json | ? | 1172.0 | 9320.9 | 9383.7 | 9397.9 | — | 0.8133 | 1.63 | 2.04 |
+| eval_results_trt_fulltrt_final.json | ? | 2176.8 | 5546.8 | 5750.5 | 5796.3 | — | 0.6533 | 2.75 | 1.1 |
+| eval_results_trt_fulltrt_fp16.json | ? | 2169.9 | 9681.7 | 9896.5 | 9944.9 | — | 0.1748 | 1.57 | 1.1 |
+| eval_results_trt_fulltrt_int8_518.json | ? | 2030.2 | 13821.2 | 13950.1 | 13979.1 | — | 0.8115 | 1.1 | 1.18 |
+| eval_results_trt_fulltrt_nofuse.json | ? | 2176.8 | 5578.9 | 5791.4 | 5839.2 | — | 0.6515 | 2.73 | 1.1 |
+| eval_results_trt_modelopt_pc_max.json | ? | 1029.6 | 6136.2 | 6307.2 | 6345.7 | — | 0.6507 | 2.48 | 2.33 |
+
+Wrote deploy/artifacts/results/comparison.md and deploy/artifacts/results/comparison.csv
+=== [02:27:15] FIX: FIX PASS DONE. ===

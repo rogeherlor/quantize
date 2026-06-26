@@ -26,3 +26,50 @@ ipdb == 0.13.13
 git+https://github.com/cvg/LightGlue.git
 
 timm == 1.0.20
+
+# ── TensorRT deployment (deploy/, scripts/trt_*.py, scripts/bench_trt_*.py) ──
+# tensorrt + pycuda come from the JetPack / l4t base image — do NOT pip-install
+# them here (the wheels must match the system CUDA/TRT). Verify both with:
+#   python -c "import tensorrt, pycuda; print(tensorrt.__version__)"
+# If pycuda is missing from your base image, install it explicitly:
+#   pip install pycuda
+#
+# nvidia-modelopt (ModelOpt INT8 PTQ — scripts/export_modelopt_ptq.py, eval_modelopt_torch.py).
+# DO NOT install with deps and NEVER use the [torch] extra on Jetson: modelopt 0.44 pins
+# torch>=2.8, which would CLOBBER the JetPack torch 2.7 (breaks cuda_ok). It runs fine on
+# 2.7 for INT8 quantize despite the pip warning. Install WITHOUT deps, forcing PyPI:
+#   pip install nvidia-modelopt --no-deps --index-url https://pypi.org/simple/
+#   python -c "import modelopt.torch.quantization as mtq; print(mtq.INT8_DEFAULT_CFG['algorithm'])"
+# --no-deps skips modelopt's torch-independent runtime deps, so install those explicitly
+# (none pull torch):
+pydantic                    # modelopt config schema
+rich                        # modelopt logging
+pulp                        # modelopt searcher (LP)
+ninja                       # modelopt kernel build
+scipy                       # modelopt nas interpolation
+cppimport                   # modelopt C++ ext loader (pulls pybind11)
+regex                       # modelopt quantization algorithms
+#
+# fp16 ONNX conversion (shrinks build-time weight footprint so TRT can build on the
+# 7.4 GB Orin Nano) uses scripts/onnx_to_fp16.py, which needs ONLY `onnx` (above) —
+# deliberately NOT onnxconverter-common, which can't be pip-installed in the offline
+# container. So nothing extra to install for fp16 conversion.
+#
+# Optional (not needed by the core pipeline):
+#   onnxsim       # only for onnx_exporter.export_vggt_to_onnx(simplify=True)
+#
+# TRT numerical debugging (localizing the DINO fp16/export accuracy gap). Both resolve
+# from PyPI, which the Docker build already uses (Dockerfile.jetson: --index-url
+# https://pypi.org/simple/). NOTE: an *interactive* `pip install` inside the running
+# container may instead hit the dead jp6 index — force PyPI there:
+#   pip install onnxruntime --index-url https://pypi.org/simple/
+polygraphy == 0.47.1        # inspect ONNX graphs + numerical TRT parity (polygraphy run)
+onnxruntime                 # CPU golden for `polygraphy run --onnxrt` per-layer TRT↔ONNX diff
+                            # (unpinned: let pip pick the wheel matching the base image Python)
+#
+# INDEX NOTE: the Docker build reaches PyPI + pypi.ngc.nvidia.com (Dockerfile.jetson),
+# so the packages above install at build time. An interactive pip *inside* the running
+# container may default to the jp6 index whose host fails DNS — for ad-hoc installs there,
+# pass `--index-url https://pypi.org/simple/`. nvidia-modelopt is the exception (jp6/NGC
+# only): install with `pip install nvidia-modelopt --no-deps` (NEVER the [torch] extra —
+# it clobbers the JetPack CUDA torch).

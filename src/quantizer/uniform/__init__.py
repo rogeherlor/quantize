@@ -1,5 +1,6 @@
 # ref: https://github.com/DensoITLab/nuLSQ/tree/master
 from .lsq import LSQ_quantizer
+from .lsqu import LSQU_quantizer
 from .minmaxq import MinMax_quantizer
 from .lsqc import LSQC_quantizer
 from .lsqs import LSQS_quantizer

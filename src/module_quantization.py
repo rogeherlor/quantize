@@ -186,6 +186,13 @@ class QConv2d(nn.Conv2d):
 
 
 def _forward_common(module, input):
+    # The quantizers carry fp32 scales, so dividing an fp16 activation by the
+    # scale can promote it to fp32 mid-forward. To keep a quantized layer
+    # dtype-transparent to its (often plain-fp16) neighbours, remember the input
+    # dtype here and cast the output back to it before returning. No-op when the
+    # forward is already single-dtype (fp32 server runs, autocast training).
+    _orig_input_dtype = input.dtype
+
     if module.weight_norm in ["WN", "LWN"]:
         mean = module.weight.mean()
         std = module.weight.std()
@@ -349,10 +356,23 @@ def _forward_common(module, input):
     if module.weight_norm in ["WN", "LWN"]:
         weight = weight.mul(std)
 
+    # F.linear / F.conv2d require matching operand dtypes; align weight/bias to
+    # the (possibly promoted) activation dtype before the op.
+    bias = module.bias
+    if weight.dtype != input.dtype:
+        weight = weight.to(input.dtype)
+    if bias is not None and bias.dtype != input.dtype:
+        bias = bias.to(input.dtype)
+
     if module.__class__.__name__ == "QLinear":
-        out = F.linear(input, weight, module.bias)
+        out = F.linear(input, weight, bias)
     elif module.__class__.__name__ == "QConv2d":
-        out = F.conv2d(input, weight, module.bias, module.stride, module.padding, module.dilation, module.groups)
+        out = F.conv2d(input, weight, bias, module.stride, module.padding, module.dilation, module.groups)
+
+    # Restore the original activation dtype so the layer is transparent to the
+    # rest of the network (e.g. an fp16 model whose scales promoted it to fp32).
+    if out.dtype != _orig_input_dtype:
+        out = out.to(_orig_input_dtype)
 
     return out
 

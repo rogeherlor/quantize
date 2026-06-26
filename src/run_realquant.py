@@ -293,35 +293,54 @@ def pack_model_to_real_int(model, layer_names):
     return model
 
 def get_model_size_mb(model):
+    """Return total storage in MB, counting each tensor at its actual dtype size.
+
+    W4Linear stores weight_packed as uint8 with shape [out, in//2] — already
+    half the bytes of W8, so numel * element_size correctly gives 0.5 bytes per
+    original weight.  Must be called BEFORE any in-place replacement that changes
+    the model so the snapshot reflects the desired precision level.
+    """
     total_bytes = 0
-    seen_params = set()
-    
-    # buffers incudes registered integer tensors
-    for param in list(model.parameters()) + list(model.buffers()):
-        if param in seen_params:
+    seen = set()
+    for t in list(model.parameters()) + list(model.buffers()):
+        tid = id(t)
+        if tid in seen:
             continue
-        seen_params.add(param)
-        
-        total_bytes += param.numel() * param.element_size()
-            
+        seen.add(tid)
+        total_bytes += t.numel() * t.element_size()
     return total_bytes / 1024 / 1024
 
 
-def benchmark_model(model, name, trainer):
+def log_model_size_breakdown(model, label, log_fn=None):
+    """Log a per-dtype parameter/buffer breakdown useful for reporting."""
+    if log_fn is None:
+        log_fn = logger.info
+    from collections import defaultdict
+    dtype_bytes = defaultdict(int)
+    seen = set()
+    for t in list(model.parameters()) + list(model.buffers()):
+        tid = id(t)
+        if tid in seen:
+            continue
+        seen.add(tid)
+        dtype_bytes[str(t.dtype)] += t.numel() * t.element_size()
+    total = sum(dtype_bytes.values()) / 1024 / 1024
+    log_fn(f"[Size breakdown] {label}: {total:.2f} MB total")
+    for dt, b in sorted(dtype_bytes.items()):
+        log_fn(f"  {dt:<20}: {b/1024/1024:8.2f} MB")
+    return total
+
+
+def benchmark_model(model, name, trainer, size_mb=None):
     """
     Benchmark a model using torch.utils.benchmark.Timer for comprehensive timing.
-    
-    This captures:
-    - GPU kernel execution time
-    - Memory transfer overhead (including faster INT8 loads)
-    - CPU-side PyTorch overhead
-    - Framework dispatch logic
-    
-    This gives a more realistic end-to-end performance measurement compared to
-    CUDA Events which only measure kernel time.
+
+    size_mb must be passed in because run_realquant_vggt modifies models in-place;
+    calling get_model_size_mb here would always reflect the final (packed) state.
     """
+    display_size = size_mb if size_mb is not None else get_model_size_mb(model)
     logger.info(f"\n{name} Evaluation:")
-    logger.info(f"  Model size: {get_model_size_mb(model):.2f} MB")
+    logger.info(f"  Model size: {display_size:.2f} MB")
     
     model.eval()
     
@@ -354,11 +373,11 @@ def benchmark_model(model, name, trainer):
     
     median_time_s = measurement.median
     mean_time_s = measurement.mean
-    
+
     logger.info(f"  Evaluation time (median): {median_time_s:.3f}s  (mean: {mean_time_s:.3f}s)")
     logger.info(f"  Runs: {measurement.number_per_run}, IQR: {measurement.iqr:.4f}s")
-    
-    return median_time_s  # Use median as it's more robust to outliers
+
+    return median_time_s, display_size
 
 
 def run_realquant_vggt(rank, args):
@@ -381,7 +400,13 @@ def run_realquant_vggt(rank, args):
     trainer = Trainer(**cfg)
     original_model = trainer.model.module
 
+    # Snapshot original size before selective_quantize_layers mutates the model in-place.
+    original_size_mb = log_model_size_breakdown(original_model, "Original FP32")
+
     quant_model = selective_quantize_layers(original_model, args, QLAYERS)
+
+    # After QAT layer replacement (QLinear adds scale params) but before packing.
+    fake_quant_size_mb = log_model_size_breakdown(quant_model, "Fake-quantized (QLinear, FP32 sim)")
 
     logger.info(f"Loading checkpoint from {args.init_from}")
     checkpoint = torch.load(args.init_from, map_location="cpu")
@@ -395,6 +420,9 @@ def run_realquant_vggt(rank, args):
     logger.info(f"Model loaded. Missing keys: {len(missing) if missing else 0}, Unexpected keys: {len(unexpected) if unexpected else 0}")
     
     quant_model_real = pack_model_to_real_int(quant_model, QLAYERS)
+
+    # After packing: W4Linear stores weight_packed as uint8 [out, in//2] → 4 bits/weight.
+    real_quant_size_mb = log_model_size_breakdown(quant_model_real, "Real-quantized (W4/W8 packed INT)")
 
     # ========================================================================
     # PROFILING SETUP
@@ -468,9 +496,9 @@ def run_realquant_vggt(rank, args):
     logger.info("EAGER MODE BENCHMARKING (No torch.compile)")
     logger.info("="*70)
     torch.cuda.profiler.start()
-    real_quant_time = benchmark_model(quant_model_real, "Real Quantized (W8/W4 INT)", trainer)
-    fake_quant_time = benchmark_model(quant_model, "Fake Quantized (FP32 simulation)", trainer)
-    original_time = benchmark_model(original_model, "Original FP32", trainer)
+    real_quant_time, _ = benchmark_model(quant_model_real, "Real Quantized (W8/W4 INT)", trainer, size_mb=real_quant_size_mb)
+    fake_quant_time, _ = benchmark_model(quant_model, "Fake Quantized (FP32 simulation)", trainer, size_mb=fake_quant_size_mb)
+    original_time, _ = benchmark_model(original_model, "Original FP32", trainer, size_mb=original_size_mb)
     torch.cuda.profiler.stop()
     # ========================================================================
     # COMPILE MODELS AND BENCHMARK - IMPORTANT FOR PRODUCTION
@@ -525,9 +553,9 @@ def run_realquant_vggt(rank, args):
     logger.info("COMPILED MODE BENCHMARKING (torch.compile enabled)")
     logger.info("="*70)
     torch.cuda.profiler.start()
-    real_quant_time_compiled = benchmark_model(quant_model_real_compiled, "Real Quantized COMPILED (W8/W4 INT)", trainer)
-    fake_quant_time_compiled = benchmark_model(quant_model_compiled, "Fake Quantized COMPILED (FP32)", trainer)
-    original_time_compiled = benchmark_model(original_model_compiled, "Original FP32 COMPILED", trainer)
+    real_quant_time_compiled, _ = benchmark_model(quant_model_real_compiled, "Real Quantized COMPILED (W8/W4 INT)", trainer, size_mb=real_quant_size_mb)
+    fake_quant_time_compiled, _ = benchmark_model(quant_model_compiled, "Fake Quantized COMPILED (FP32)", trainer, size_mb=fake_quant_size_mb)
+    original_time_compiled, _ = benchmark_model(original_model_compiled, "Original FP32 COMPILED", trainer, size_mb=original_size_mb)
     torch.cuda.profiler.stop()
     
     # ========================================================================
@@ -537,26 +565,29 @@ def run_realquant_vggt(rank, args):
     logger.info("PERFORMANCE SUMMARY")
     logger.info("="*70)
     
+    size_reduction = original_size_mb / real_quant_size_mb
+
     logger.info("\nEAGER MODE (No Compilation):")
-    logger.info(f"  Real Quantized:  {real_quant_time:.2f}s  ({get_model_size_mb(quant_model_real):.2f} MB)")
-    logger.info(f"  Fake Quantized:  {fake_quant_time:.2f}s  ({get_model_size_mb(quant_model):.2f} MB)")
-    logger.info(f"  Original FP32:   {original_time:.2f}s  ({get_model_size_mb(original_model):.2f} MB)")
+    logger.info(f"  Real Quantized:  {real_quant_time:.2f}s  ({real_quant_size_mb:.2f} MB)")
+    logger.info(f"  Fake Quantized:  {fake_quant_time:.2f}s  ({fake_quant_size_mb:.2f} MB)")
+    logger.info(f"  Original FP32:   {original_time:.2f}s  ({original_size_mb:.2f} MB)")
     logger.info(f"  Speedup vs FP32: {original_time/real_quant_time:.2f}x")
     logger.info(f"  Speedup vs Fake: {fake_quant_time/real_quant_time:.2f}x")
-    
+
     logger.info("\nCOMPILED MODE (torch.compile):")
     logger.info(f"  Real Quantized:  {real_quant_time_compiled:.2f}s")
     logger.info(f"  Fake Quantized:  {fake_quant_time_compiled:.2f}s")
     logger.info(f"  Original FP32:   {original_time_compiled:.2f}s")
     logger.info(f"  Speedup vs FP32: {original_time_compiled/real_quant_time_compiled:.2f}x")
     logger.info(f"  Speedup vs Fake: {fake_quant_time_compiled/real_quant_time_compiled:.2f}x")
-    
+
     logger.info("\nCOMPILATION BENEFIT:")
     logger.info(f"  Real Quantized:  {real_quant_time/real_quant_time_compiled:.2f}x faster with compile")
     logger.info(f"  Fake Quantized:  {fake_quant_time/fake_quant_time_compiled:.2f}x faster with compile")
     logger.info(f"  Original FP32:   {original_time/original_time_compiled:.2f}x faster with compile")
-    
-    logger.info(f"\nModel size reduction: {get_model_size_mb(original_model)/get_model_size_mb(quant_model_real):.2f}x")
+
+    logger.info(f"\nModel size:  Original {original_size_mb:.2f} MB  →  Packed {real_quant_size_mb:.2f} MB  ({size_reduction:.2f}x reduction)")
+    logger.info("NOTE: timing comparison is valid only when the three model objects are separate instances.")
     logger.info("="*70)
 
 

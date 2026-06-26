@@ -1,0 +1,58 @@
+2026-06-25 22:08:07,219 - src_logger - INFO - Loading full VGGT (fp16) for torch eval @ 350x518 ...
+2026-06-25 22:08:10,563 - src_logger - INFO - Pre-allocating model pool: 2700 MB (kept alive) ...
+2026-06-25 22:08:11,424 - src_logger - INFO - Pre-allocating activation pool: 1600 MB (separate NvMap segments — model pool still alive) ...
+2026-06-25 22:08:12,186 - src_logger - INFO - Pools ready: model 2700 MB + activation 1600 MB  | CUDA free: 1617 MB
+2026-06-25 22:08:13,677 - src_logger - INFO - Streaming checkpoint (torch.float16) from data3/rogelio/model_zoo/vggt/vggt_1B_commercial.pt ...
+2026-06-25 22:09:33,804 - src_logger - INFO - Loaded — missing: 0, unexpected: 0
+2026-06-25 22:09:36,659 - src_logger - INFO - Activation pool released: 1600 MB contiguous free for inference  | CUDA allocated: 2396 MB
+2026-06-25 22:09:36,744 - src_logger - INFO - Evaluating PyTorch fp16 @ 350x518 → deploy/artifacts/results/eval_results_torch_350x518.json
+2026-06-25 22:09:37,032 - src_logger - INFO - [Jetson] Detected 7.4 GB VRAM — using DPT frames_chunk_size=2 (vs default 8) to fit 10-frame activations in unified memory.
+2026-06-25 22:09:37,033 - src_logger - INFO - Evaluation dtype: torch.float16 (Jetson 7.4 GB — matching model dtype, avoids BF16 cast overhead)
+2026-06-25 22:10:03,701 - src_logger - INFO - Model weight memory: 2146 MB
+2026-06-25 22:10:03,702 - src_logger - INFO - Warming up CUDA kernels (1 synthetic forward pass) ...
+/workspace/scripts/../src/models/depth/vggt/vggt/models/vggt.py:71: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with torch.cuda.amp.autocast(enabled=False):
+2026-06-25 22:10:12,912 - src_logger - INFO - Warmup done. Resetting peak memory stats — timing starts now.
+2026-06-25 22:10:12,913 - src_logger - INFO - Restricting evaluation to categories: ['apple']
+2026-06-25 22:10:12,913 - src_logger - INFO - Capping evaluation to 2 sequence(s) per category
+2026-06-25 22:10:12,913 - src_logger - INFO - Loading annotation for apple test set
+2026-06-25 22:10:13,077 - src_logger - INFO - Testing Sequences: 
+2026-06-25 22:10:13,077 - src_logger - INFO - ['110_13051_23361', '12_104_640']
+2026-06-25 22:10:13,078 - src_logger - INFO - --------------------------------------------------
+2026-06-25 22:10:13,078 - src_logger - INFO - Processing 110_13051_23361 for apple test set
+Image ids [ 18 171 107  98 178 183   5 146  12 152]
+[mem] before forward: 2.29 GB allocated, 4.55 GB reserved
+/workspace/scripts/../src/models/depth/vggt/evaluation/test_co3d.py:335: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with torch.cuda.amp.autocast(dtype=torch.float64):
+/workspace/scripts/../src/models/depth/vggt/evaluation/test_co3d.py:339: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with torch.cuda.amp.autocast(dtype=torch.float64):
+apple sequence 110_13051_23361 R_ACC@5: 0.2889
+apple sequence 110_13051_23361 T_ACC@5: 0.0889
+2026-06-25 22:10:21,791 - src_logger - INFO -   time=8.7s  peak_cuda=3282MB  activations=1136MB
+2026-06-25 22:10:21,792 - src_logger - INFO - --------------------------------------------------
+2026-06-25 22:10:21,792 - src_logger - INFO - --------------------------------------------------
+2026-06-25 22:10:21,792 - src_logger - INFO - Processing 12_104_640 for apple test set
+Image ids [110  47 115  78 150 132  40  52  54  57]
+[mem] before forward: 2.29 GB allocated, 4.55 GB reserved
+apple sequence 12_104_640 R_ACC@5: 0.4667
+apple sequence 12_104_640 T_ACC@5: 0.2000
+2026-06-25 22:10:30,181 - src_logger - INFO -   time=8.4s  peak_cuda=3282MB  activations=1136MB
+2026-06-25 22:10:30,182 - src_logger - INFO - --------------------------------------------------
+2026-06-25 22:10:30,185 - src_logger - INFO - ================================================================================
+2026-06-25 22:10:30,186 - src_logger - INFO - [1m[94mAUC of apple test set:[0m [92m0.6537 (AUC@30), 0.3615 (AUC@15), 0.0267 (AUC@5), 0.0074 (AUC@3)[0m
+2026-06-25 22:10:30,186 - src_logger - INFO - [1m[94mMean AUC of categories by now:[0m [91m0.6537 (AUC@30), 0.3615 (AUC@15), 0.0267 (AUC@5), 0.0074 (AUC@3)[0m
+2026-06-25 22:10:30,187 - src_logger - INFO - ================================================================================
+2026-06-25 22:10:30,187 - src_logger - INFO - 
+Summary of AUC results:
+2026-06-25 22:10:30,187 - src_logger - INFO - --------------------------------------------------
+2026-06-25 22:10:30,188 - src_logger - INFO - apple          : 0.6537 (AUC@30), 0.3615 (AUC@15), 0.0267 (AUC@5), 0.0074 (AUC@3)
+2026-06-25 22:10:30,188 - src_logger - INFO - --------------------------------------------------
+2026-06-25 22:10:30,189 - src_logger - INFO - Mean AUC: 0.6537 (AUC@30), 0.3615 (AUC@15), 0.0267 (AUC@5), 0.0074 (AUC@3)
+2026-06-25 22:10:30,189 - src_logger - INFO - ==================================================
+2026-06-25 22:10:30,189 - src_logger - INFO - Performance summary (2 sequences, after warmup):
+2026-06-25 22:10:30,189 - src_logger - INFO -   Model weights:    2146 MB
+2026-06-25 22:10:30,192 - src_logger - INFO -   Per-sequence latency:  mean=8.5s  std=0.2s  min=8.4s  max=8.7s
+2026-06-25 22:10:30,193 - src_logger - INFO -   Latency percentiles:   p50=8.5s  p90=8.7s  p99=8.7s
+2026-06-25 22:10:30,193 - src_logger - INFO -   Total wall time: 0.3 min
+2026-06-25 22:10:30,193 - src_logger - INFO -   Peak CUDA (last seq): allocated=3282 MB  reserved=4342 MB
+2026-06-25 22:10:30,197 - src_logger - INFO - Results saved to deploy/artifacts/results/eval_results_torch_350x518.json

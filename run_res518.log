@@ -1,0 +1,871 @@
+=== [23:15:23] Wait for INT8@518 slices (standalone export) ... ===
+=== [00:46:26] Config 4: Hybrid INT8 @518 (build INT8 chain engines + eval) ===
+fp16 conversion: 288 initializers, 209 constants, 136 Cast targets → fp16; I/O set to fp16. Wrote /workspace/scripts/../deploy/artifacts/onnx/chain_modelopt_max_pc_518x518/chain_modelopt_max_pc_518x518_s0_fp16.onnx
+=== build INT8 chain engine s0 → /workspace/scripts/../deploy/artifacts/engines/chain_modelopt_max_pc_518x518_s0.trt ===
+&&&& RUNNING TensorRT.trtexec [TensorRT v100300] # /usr/src/tensorrt/bin/trtexec --onnx=/workspace/scripts/../deploy/artifacts/onnx/chain_modelopt_max_pc_518x518/chain_modelopt_max_pc_518x518_s0_fp16.onnx --saveEngine=/workspace/scripts/../deploy/artifacts/engines/chain_modelopt_max_pc_518x518_s0.trt --stronglyTyped --maxAuxStreams=0 --memPoolSize=workspace:512 --builderOptimizationLevel=3 --skipInference --timingCacheFile=/workspace/scripts/../deploy/artifacts/timing_cache/orin_sm87.cache
+[06/26/2026-00:46:29] [I] === Model Options ===
+[06/26/2026-00:46:29] [I] Format: ONNX
+[06/26/2026-00:46:29] [I] Model: /workspace/scripts/../deploy/artifacts/onnx/chain_modelopt_max_pc_518x518/chain_modelopt_max_pc_518x518_s0_fp16.onnx
+[06/26/2026-00:46:29] [I] Output:
+[06/26/2026-00:46:29] [I] === Build Options ===
+[06/26/2026-00:46:29] [I] Memory Pools: workspace: 512 MiB, dlaSRAM: default, dlaLocalDRAM: default, dlaGlobalDRAM: default, tacticSharedMem: default
+[06/26/2026-00:46:29] [I] avgTiming: 8
+[06/26/2026-00:46:29] [I] Precision: Strongly Typed
+[06/26/2026-00:46:29] [I] LayerPrecisions: 
+[06/26/2026-00:46:29] [I] Layer Device Types: 
+[06/26/2026-00:46:29] [I] Calibration: 
+[06/26/2026-00:46:29] [I] Refit: Disabled
+[06/26/2026-00:46:29] [I] Strip weights: Disabled
+[06/26/2026-00:46:29] [I] Version Compatible: Disabled
+[06/26/2026-00:46:29] [I] ONNX Plugin InstanceNorm: Disabled
+[06/26/2026-00:46:29] [I] TensorRT runtime: full
+[06/26/2026-00:46:29] [I] Lean DLL Path: 
+[06/26/2026-00:46:29] [I] Tempfile Controls: { in_memory: allow, temporary: allow }
+[06/26/2026-00:46:29] [I] Exclude Lean Runtime: Disabled
+[06/26/2026-00:46:29] [I] Sparsity: Disabled
+[06/26/2026-00:46:29] [I] Safe mode: Disabled
+[06/26/2026-00:46:29] [I] Build DLA standalone loadable: Disabled
+[06/26/2026-00:46:29] [I] Allow GPU fallback for DLA: Disabled
+[06/26/2026-00:46:29] [I] DirectIO mode: Disabled
+[06/26/2026-00:46:29] [I] Restricted mode: Disabled
+[06/26/2026-00:46:29] [I] Skip inference: Enabled
+[06/26/2026-00:46:29] [I] Save engine: /workspace/scripts/../deploy/artifacts/engines/chain_modelopt_max_pc_518x518_s0.trt
+[06/26/2026-00:46:29] [I] Load engine: 
+[06/26/2026-00:46:29] [I] Profiling verbosity: 0
+[06/26/2026-00:46:29] [I] Tactic sources: Using default tactic sources
+[06/26/2026-00:46:29] [I] timingCacheMode: global
+[06/26/2026-00:46:29] [I] timingCacheFile: /workspace/scripts/../deploy/artifacts/timing_cache/orin_sm87.cache
+[06/26/2026-00:46:29] [I] Enable Compilation Cache: Enabled
+[06/26/2026-00:46:29] [I] errorOnTimingCacheMiss: Disabled
+[06/26/2026-00:46:29] [I] Preview Features: Use default preview flags.
+[06/26/2026-00:46:29] [I] MaxAuxStreams: 0
+[06/26/2026-00:46:29] [I] BuilderOptimizationLevel: 3
+[06/26/2026-00:46:29] [I] Calibration Profile Index: 0
+[06/26/2026-00:46:29] [I] Weight Streaming: Disabled
+[06/26/2026-00:46:29] [I] Runtime Platform: Same As Build
+[06/26/2026-00:46:29] [I] Debug Tensors: 
+[06/26/2026-00:46:29] [I] Input(s)s format: fp32:CHW
+[06/26/2026-00:46:29] [I] Output(s)s format: fp32:CHW
+[06/26/2026-00:46:29] [I] Input build shapes: model
+[06/26/2026-00:46:29] [I] Input calibration shapes: model
+[06/26/2026-00:46:29] [I] === System Options ===
+[06/26/2026-00:46:29] [I] Device: 0
+[06/26/2026-00:46:29] [I] DLACore: 
+[06/26/2026-00:46:29] [I] Plugins:
+[06/26/2026-00:46:29] [I] setPluginsToSerialize:
+[06/26/2026-00:46:29] [I] dynamicPlugins:
+[06/26/2026-00:46:29] [I] ignoreParsedPluginLibs: 0
+[06/26/2026-00:46:29] [I] 
+[06/26/2026-00:46:29] [I] === Inference Options ===
+[06/26/2026-00:46:29] [I] Batch: Explicit
+[06/26/2026-00:46:29] [I] Input inference shapes: model
+[06/26/2026-00:46:29] [I] Iterations: 10
+[06/26/2026-00:46:29] [I] Duration: 3s (+ 200ms warm up)
+[06/26/2026-00:46:29] [I] Sleep time: 0ms
+[06/26/2026-00:46:29] [I] Idle time: 0ms
+[06/26/2026-00:46:29] [I] Inference Streams: 1
+[06/26/2026-00:46:29] [I] ExposeDMA: Disabled
+[06/26/2026-00:46:29] [I] Data transfers: Enabled
+[06/26/2026-00:46:29] [I] Spin-wait: Disabled
+[06/26/2026-00:46:29] [I] Multithreading: Disabled
+[06/26/2026-00:46:29] [I] CUDA Graph: Disabled
+[06/26/2026-00:46:29] [I] Separate profiling: Disabled
+[06/26/2026-00:46:29] [I] Time Deserialize: Disabled
+[06/26/2026-00:46:29] [I] Time Refit: Disabled
+[06/26/2026-00:46:29] [I] NVTX verbosity: 0
+[06/26/2026-00:46:29] [I] Persistent Cache Ratio: 0
+[06/26/2026-00:46:29] [I] Optimization Profile Index: 0
+[06/26/2026-00:46:29] [I] Weight Streaming Budget: 100.000000%
+[06/26/2026-00:46:29] [I] Inputs:
+[06/26/2026-00:46:29] [I] Debug Tensor Save Destinations:
+[06/26/2026-00:46:29] [I] === Reporting Options ===
+[06/26/2026-00:46:29] [I] Verbose: Disabled
+[06/26/2026-00:46:29] [I] Averages: 10 inferences
+[06/26/2026-00:46:29] [I] Percentiles: 90,95,99
+[06/26/2026-00:46:29] [I] Dump refittable layers:Disabled
+[06/26/2026-00:46:29] [I] Dump output: Disabled
+[06/26/2026-00:46:29] [I] Profile: Disabled
+[06/26/2026-00:46:29] [I] Export timing to JSON file: 
+[06/26/2026-00:46:29] [I] Export output to JSON file: 
+[06/26/2026-00:46:29] [I] Export profile to JSON file: 
+[06/26/2026-00:46:29] [I] 
+[06/26/2026-00:46:29] [I] === Device Information ===
+[06/26/2026-00:46:30] [I] Available Devices: 
+[06/26/2026-00:46:30] [I]   Device 0: "Orin" UUID: GPU-6c696d3f-23e3-50ba-ae8d-24ba698cf3a0
+[06/26/2026-00:46:30] [I] Selected Device: Orin
+[06/26/2026-00:46:30] [I] Selected Device ID: 0
+[06/26/2026-00:46:30] [I] Selected Device UUID: GPU-6c696d3f-23e3-50ba-ae8d-24ba698cf3a0
+[06/26/2026-00:46:30] [I] Compute Capability: 8.7
+[06/26/2026-00:46:30] [I] SMs: 8
+[06/26/2026-00:46:30] [I] Device Global Memory: 7619 MiB
+[06/26/2026-00:46:30] [I] Shared Memory per SM: 164 KiB
+[06/26/2026-00:46:30] [I] Memory Bus Width: 128 bits (ECC disabled)
+[06/26/2026-00:46:30] [I] Application Compute Clock Rate: 1.02 GHz
+[06/26/2026-00:46:30] [I] Application Memory Clock Rate: 0.612 GHz
+[06/26/2026-00:46:30] [I] 
+[06/26/2026-00:46:30] [I] Note: The application clock rates do not reflect the actual clock rates that the GPU is currently running at.
+[06/26/2026-00:46:30] [I] 
+[06/26/2026-00:46:30] [I] TensorRT version: 10.3.0
+[06/26/2026-00:46:30] [I] Loading standard plugins
+[06/26/2026-00:46:30] [I] [TRT] [MemUsageChange] Init CUDA: CPU +2, GPU +0, now: CPU 31, GPU 1267 (MiB)
+[06/26/2026-00:46:33] [I] [TRT] [MemUsageChange] Init builder kernel library: CPU +928, GPU +1099, now: CPU 1002, GPU 2411 (MiB)
+[06/26/2026-00:46:33] [I] Start parsing network model.
+[06/26/2026-00:46:33] [I] [TRT] ----------------------------------------------------------------
+[06/26/2026-00:46:33] [I] [TRT] Input filename:   /workspace/scripts/../deploy/artifacts/onnx/chain_modelopt_max_pc_518x518/chain_modelopt_max_pc_518x518_s0_fp16.onnx
+[06/26/2026-00:46:33] [I] [TRT] ONNX IR version:  0.0.8
+[06/26/2026-00:46:33] [I] [TRT] Opset version:    17
+[06/26/2026-00:46:33] [I] [TRT] Producer name:    pytorch
+[06/26/2026-00:46:33] [I] [TRT] Producer version: 2.7.0
+[06/26/2026-00:46:33] [I] [TRT] Domain:           
+[06/26/2026-00:46:33] [I] [TRT] Model version:    0
+[06/26/2026-00:46:33] [I] [TRT] Doc string:       
+[06/26/2026-00:46:33] [I] [TRT] ----------------------------------------------------------------
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 6) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 27) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 34) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 519) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 555) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 576) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 583) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 1067) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 1103) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 1124) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 1131) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 1613) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 1649) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 1670) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 1677) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 2159) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 2195) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 2216) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 2223) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 2705) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 2741) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 2762) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 2769) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 3251) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 3287) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 3308) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 3315) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 3797) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 3833) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 3854) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 3861) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 4343) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 4379) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 4400) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 4407) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 4889) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 4925) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 4946) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 4953) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 5435) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 5471) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 5492) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 5499) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 5981) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 6017) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 6038) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 6045) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 6527) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 6569) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 6606) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 6618) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 7117) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 7181) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 7218) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 7230) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 7729) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 7793) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 7830) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 7842) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 8341) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 8405) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 8442) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 8454) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [W] [TRT] (Unnamed Layer* 8953) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:46:33] [I] Finished parsing network model. Parse time: 0.67586
+[06/26/2026-00:46:33] [I] [TRT] Loaded 5951727 bytes of timing cache from /workspace/scripts/../deploy/artifacts/timing_cache/orin_sm87.cache
+[06/26/2026-00:46:34] [I] [TRT] Global timing cache in use. Profiling results in this builder pass will be stored.
+[06/26/2026-00:50:37] [I] [TRT] Detected 1 inputs and 1 output network tensors.
+[06/26/2026-00:50:37] [I] [TRT] Total Host Persistent Memory: 32
+[06/26/2026-00:50:37] [I] [TRT] Total Device Persistent Memory: 0
+[06/26/2026-00:50:37] [I] [TRT] Total Scratch Memory: 309541376
+[06/26/2026-00:50:37] [I] [TRT] [BlockAssignment] Started assigning block shifts. This will take 1 steps to complete.
+[06/26/2026-00:50:37] [I] [TRT] [BlockAssignment] Algorithm ShiftNTopDown took 0.030466ms to assign 1 blocks to 1 nodes requiring 309541376 bytes.
+[06/26/2026-00:50:37] [I] [TRT] Total Activation Memory: 309541376
+[06/26/2026-00:50:38] [I] [TRT] Total Weights Memory: 353145288
+[06/26/2026-00:50:38] [I] [TRT] Engine generation completed in 243.483 seconds.
+[06/26/2026-00:50:38] [I] [TRT] [MemUsageStats] Peak memory usage of TRT CPU/GPU memory allocators: CPU 0 MiB, GPU 340 MiB
+[06/26/2026-00:50:38] [I] [TRT] [MemUsageStats] Peak memory usage during Engine building and serialization: CPU: 3886 MiB
+[06/26/2026-00:50:38] [I] Engine built in 244.258 sec.
+[06/26/2026-00:50:38] [I] Created engine with size: 343.301 MiB
+[06/26/2026-00:50:38] [I] [TRT] Loaded 5951727 bytes of timing cache from /workspace/scripts/../deploy/artifacts/timing_cache/orin_sm87.cache
+[06/26/2026-00:50:38] [I] [TRT] Serialized 17681 bytes of code generator cache.
+[06/26/2026-00:50:39] [I] [TRT] Serialized 7452329 bytes of compilation cache.
+[06/26/2026-00:50:39] [I] [TRT] Serialized 355 timing cache entries
+[06/26/2026-00:50:39] [I] [TRT] Saved 7507102 bytes of timing cache to /workspace/scripts/../deploy/artifacts/timing_cache/orin_sm87.cache
+[06/26/2026-00:50:39] [I] [TRT] Loaded engine size: 343 MiB
+[06/26/2026-00:50:39] [I] Engine deserialized in 0.249038 sec.
+[06/26/2026-00:50:39] [I] Skipped inference phase since --skipInference is added.
+&&&& PASSED TensorRT.trtexec [TensorRT v100300] # /usr/src/tensorrt/bin/trtexec --onnx=/workspace/scripts/../deploy/artifacts/onnx/chain_modelopt_max_pc_518x518/chain_modelopt_max_pc_518x518_s0_fp16.onnx --saveEngine=/workspace/scripts/../deploy/artifacts/engines/chain_modelopt_max_pc_518x518_s0.trt --stronglyTyped --maxAuxStreams=0 --memPoolSize=workspace:512 --builderOptimizationLevel=3 --skipInference --timingCacheFile=/workspace/scripts/../deploy/artifacts/timing_cache/orin_sm87.cache
+fp16 conversion: 288 initializers, 257 constants, 144 Cast targets → fp16; I/O set to fp16. Wrote /workspace/scripts/../deploy/artifacts/onnx/chain_modelopt_max_pc_518x518/chain_modelopt_max_pc_518x518_s8_fp16.onnx
+=== build INT8 chain engine s8 → /workspace/scripts/../deploy/artifacts/engines/chain_modelopt_max_pc_518x518_s8.trt ===
+&&&& RUNNING TensorRT.trtexec [TensorRT v100300] # /usr/src/tensorrt/bin/trtexec --onnx=/workspace/scripts/../deploy/artifacts/onnx/chain_modelopt_max_pc_518x518/chain_modelopt_max_pc_518x518_s8_fp16.onnx --saveEngine=/workspace/scripts/../deploy/artifacts/engines/chain_modelopt_max_pc_518x518_s8.trt --stronglyTyped --maxAuxStreams=0 --memPoolSize=workspace:512 --builderOptimizationLevel=3 --skipInference --timingCacheFile=/workspace/scripts/../deploy/artifacts/timing_cache/orin_sm87.cache
+[06/26/2026-00:50:44] [I] === Model Options ===
+[06/26/2026-00:50:44] [I] Format: ONNX
+[06/26/2026-00:50:44] [I] Model: /workspace/scripts/../deploy/artifacts/onnx/chain_modelopt_max_pc_518x518/chain_modelopt_max_pc_518x518_s8_fp16.onnx
+[06/26/2026-00:50:44] [I] Output:
+[06/26/2026-00:50:44] [I] === Build Options ===
+[06/26/2026-00:50:44] [I] Memory Pools: workspace: 512 MiB, dlaSRAM: default, dlaLocalDRAM: default, dlaGlobalDRAM: default, tacticSharedMem: default
+[06/26/2026-00:50:44] [I] avgTiming: 8
+[06/26/2026-00:50:44] [I] Precision: Strongly Typed
+[06/26/2026-00:50:44] [I] LayerPrecisions: 
+[06/26/2026-00:50:44] [I] Layer Device Types: 
+[06/26/2026-00:50:44] [I] Calibration: 
+[06/26/2026-00:50:44] [I] Refit: Disabled
+[06/26/2026-00:50:44] [I] Strip weights: Disabled
+[06/26/2026-00:50:44] [I] Version Compatible: Disabled
+[06/26/2026-00:50:44] [I] ONNX Plugin InstanceNorm: Disabled
+[06/26/2026-00:50:44] [I] TensorRT runtime: full
+[06/26/2026-00:50:44] [I] Lean DLL Path: 
+[06/26/2026-00:50:44] [I] Tempfile Controls: { in_memory: allow, temporary: allow }
+[06/26/2026-00:50:44] [I] Exclude Lean Runtime: Disabled
+[06/26/2026-00:50:44] [I] Sparsity: Disabled
+[06/26/2026-00:50:44] [I] Safe mode: Disabled
+[06/26/2026-00:50:44] [I] Build DLA standalone loadable: Disabled
+[06/26/2026-00:50:44] [I] Allow GPU fallback for DLA: Disabled
+[06/26/2026-00:50:44] [I] DirectIO mode: Disabled
+[06/26/2026-00:50:44] [I] Restricted mode: Disabled
+[06/26/2026-00:50:44] [I] Skip inference: Enabled
+[06/26/2026-00:50:44] [I] Save engine: /workspace/scripts/../deploy/artifacts/engines/chain_modelopt_max_pc_518x518_s8.trt
+[06/26/2026-00:50:44] [I] Load engine: 
+[06/26/2026-00:50:44] [I] Profiling verbosity: 0
+[06/26/2026-00:50:44] [I] Tactic sources: Using default tactic sources
+[06/26/2026-00:50:44] [I] timingCacheMode: global
+[06/26/2026-00:50:44] [I] timingCacheFile: /workspace/scripts/../deploy/artifacts/timing_cache/orin_sm87.cache
+[06/26/2026-00:50:44] [I] Enable Compilation Cache: Enabled
+[06/26/2026-00:50:44] [I] errorOnTimingCacheMiss: Disabled
+[06/26/2026-00:50:44] [I] Preview Features: Use default preview flags.
+[06/26/2026-00:50:44] [I] MaxAuxStreams: 0
+[06/26/2026-00:50:44] [I] BuilderOptimizationLevel: 3
+[06/26/2026-00:50:44] [I] Calibration Profile Index: 0
+[06/26/2026-00:50:44] [I] Weight Streaming: Disabled
+[06/26/2026-00:50:44] [I] Runtime Platform: Same As Build
+[06/26/2026-00:50:44] [I] Debug Tensors: 
+[06/26/2026-00:50:44] [I] Input(s)s format: fp32:CHW
+[06/26/2026-00:50:44] [I] Output(s)s format: fp32:CHW
+[06/26/2026-00:50:44] [I] Input build shapes: model
+[06/26/2026-00:50:44] [I] Input calibration shapes: model
+[06/26/2026-00:50:44] [I] === System Options ===
+[06/26/2026-00:50:44] [I] Device: 0
+[06/26/2026-00:50:44] [I] DLACore: 
+[06/26/2026-00:50:44] [I] Plugins:
+[06/26/2026-00:50:44] [I] setPluginsToSerialize:
+[06/26/2026-00:50:44] [I] dynamicPlugins:
+[06/26/2026-00:50:44] [I] ignoreParsedPluginLibs: 0
+[06/26/2026-00:50:44] [I] 
+[06/26/2026-00:50:44] [I] === Inference Options ===
+[06/26/2026-00:50:44] [I] Batch: Explicit
+[06/26/2026-00:50:44] [I] Input inference shapes: model
+[06/26/2026-00:50:44] [I] Iterations: 10
+[06/26/2026-00:50:44] [I] Duration: 3s (+ 200ms warm up)
+[06/26/2026-00:50:44] [I] Sleep time: 0ms
+[06/26/2026-00:50:44] [I] Idle time: 0ms
+[06/26/2026-00:50:44] [I] Inference Streams: 1
+[06/26/2026-00:50:44] [I] ExposeDMA: Disabled
+[06/26/2026-00:50:44] [I] Data transfers: Enabled
+[06/26/2026-00:50:44] [I] Spin-wait: Disabled
+[06/26/2026-00:50:44] [I] Multithreading: Disabled
+[06/26/2026-00:50:44] [I] CUDA Graph: Disabled
+[06/26/2026-00:50:44] [I] Separate profiling: Disabled
+[06/26/2026-00:50:44] [I] Time Deserialize: Disabled
+[06/26/2026-00:50:44] [I] Time Refit: Disabled
+[06/26/2026-00:50:44] [I] NVTX verbosity: 0
+[06/26/2026-00:50:44] [I] Persistent Cache Ratio: 0
+[06/26/2026-00:50:44] [I] Optimization Profile Index: 0
+[06/26/2026-00:50:44] [I] Weight Streaming Budget: 100.000000%
+[06/26/2026-00:50:44] [I] Inputs:
+[06/26/2026-00:50:44] [I] Debug Tensor Save Destinations:
+[06/26/2026-00:50:44] [I] === Reporting Options ===
+[06/26/2026-00:50:44] [I] Verbose: Disabled
+[06/26/2026-00:50:44] [I] Averages: 10 inferences
+[06/26/2026-00:50:44] [I] Percentiles: 90,95,99
+[06/26/2026-00:50:44] [I] Dump refittable layers:Disabled
+[06/26/2026-00:50:44] [I] Dump output: Disabled
+[06/26/2026-00:50:44] [I] Profile: Disabled
+[06/26/2026-00:50:44] [I] Export timing to JSON file: 
+[06/26/2026-00:50:44] [I] Export output to JSON file: 
+[06/26/2026-00:50:44] [I] Export profile to JSON file: 
+[06/26/2026-00:50:44] [I] 
+[06/26/2026-00:50:44] [I] === Device Information ===
+[06/26/2026-00:50:44] [I] Available Devices: 
+[06/26/2026-00:50:44] [I]   Device 0: "Orin" UUID: GPU-6c696d3f-23e3-50ba-ae8d-24ba698cf3a0
+[06/26/2026-00:50:44] [I] Selected Device: Orin
+[06/26/2026-00:50:44] [I] Selected Device ID: 0
+[06/26/2026-00:50:44] [I] Selected Device UUID: GPU-6c696d3f-23e3-50ba-ae8d-24ba698cf3a0
+[06/26/2026-00:50:44] [I] Compute Capability: 8.7
+[06/26/2026-00:50:44] [I] SMs: 8
+[06/26/2026-00:50:44] [I] Device Global Memory: 7619 MiB
+[06/26/2026-00:50:44] [I] Shared Memory per SM: 164 KiB
+[06/26/2026-00:50:44] [I] Memory Bus Width: 128 bits (ECC disabled)
+[06/26/2026-00:50:44] [I] Application Compute Clock Rate: 1.02 GHz
+[06/26/2026-00:50:44] [I] Application Memory Clock Rate: 0.612 GHz
+[06/26/2026-00:50:44] [I] 
+[06/26/2026-00:50:44] [I] Note: The application clock rates do not reflect the actual clock rates that the GPU is currently running at.
+[06/26/2026-00:50:44] [I] 
+[06/26/2026-00:50:44] [I] TensorRT version: 10.3.0
+[06/26/2026-00:50:44] [I] Loading standard plugins
+[06/26/2026-00:50:44] [I] [TRT] [MemUsageChange] Init CUDA: CPU +2, GPU +0, now: CPU 31, GPU 2021 (MiB)
+[06/26/2026-00:50:46] [I] [TRT] [MemUsageChange] Init builder kernel library: CPU +928, GPU +750, now: CPU 1002, GPU 2815 (MiB)
+[06/26/2026-00:50:46] [I] Start parsing network model.
+[06/26/2026-00:50:46] [I] [TRT] ----------------------------------------------------------------
+[06/26/2026-00:50:46] [I] [TRT] Input filename:   /workspace/scripts/../deploy/artifacts/onnx/chain_modelopt_max_pc_518x518/chain_modelopt_max_pc_518x518_s8_fp16.onnx
+[06/26/2026-00:50:46] [I] [TRT] ONNX IR version:  0.0.8
+[06/26/2026-00:50:46] [I] [TRT] Opset version:    17
+[06/26/2026-00:50:46] [I] [TRT] Producer name:    pytorch
+[06/26/2026-00:50:46] [I] [TRT] Producer version: 2.7.0
+[06/26/2026-00:50:46] [I] [TRT] Domain:           
+[06/26/2026-00:50:46] [I] [TRT] Model version:    0
+[06/26/2026-00:50:46] [I] [TRT] Doc string:       
+[06/26/2026-00:50:46] [I] [TRT] ----------------------------------------------------------------
+[06/26/2026-00:50:46] [W] [TRT] (Unnamed Layer* 12) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:46] [W] [TRT] (Unnamed Layer* 49) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:46] [W] [TRT] (Unnamed Layer* 61) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 563) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 627) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 664) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 676) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 1177) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 1241) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 1278) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 1290) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 1789) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 1853) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 1890) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 1902) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 2401) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 2465) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 2502) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 2514) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 3013) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 3077) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 3114) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 3126) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 3625) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 3689) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 3726) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 3738) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 4237) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 4301) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 4338) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 4350) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 4849) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 4907) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 4928) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 4935) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 5417) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 5453) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 5474) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 5481) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 5963) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 5999) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 6020) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 6027) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 6509) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 6545) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 6566) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 6573) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 7055) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 7091) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 7112) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 7119) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 7601) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 7637) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 7658) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 7665) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 8147) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 8183) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 8204) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 8211) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 8693) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 8729) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 8750) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 8757) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [W] [TRT] (Unnamed Layer* 9239) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:50:47] [I] Finished parsing network model. Parse time: 0.660148
+[06/26/2026-00:50:47] [I] [TRT] Loaded 7507102 bytes of timing cache from /workspace/scripts/../deploy/artifacts/timing_cache/orin_sm87.cache
+[06/26/2026-00:50:48] [I] [TRT] Global timing cache in use. Profiling results in this builder pass will be stored.
+[06/26/2026-00:52:02] [I] [TRT] Detected 1 inputs and 1 output network tensors.
+[06/26/2026-00:52:02] [I] [TRT] Total Host Persistent Memory: 32
+[06/26/2026-00:52:02] [I] [TRT] Total Device Persistent Memory: 0
+[06/26/2026-00:52:02] [I] [TRT] Total Scratch Memory: 288430592
+[06/26/2026-00:52:02] [I] [TRT] [BlockAssignment] Started assigning block shifts. This will take 1 steps to complete.
+[06/26/2026-00:52:02] [I] [TRT] [BlockAssignment] Algorithm ShiftNTopDown took 0.028737ms to assign 1 blocks to 1 nodes requiring 288430592 bytes.
+[06/26/2026-00:52:02] [I] [TRT] Total Activation Memory: 288430592
+[06/26/2026-00:52:02] [I] [TRT] Total Weights Memory: 302993864
+[06/26/2026-00:52:02] [I] [TRT] Engine generation completed in 74.6392 seconds.
+[06/26/2026-00:52:02] [I] [TRT] [MemUsageStats] Peak memory usage of TRT CPU/GPU memory allocators: CPU 0 MiB, GPU 292 MiB
+[06/26/2026-00:52:02] [I] [TRT] [MemUsageStats] Peak memory usage during Engine building and serialization: CPU: 3682 MiB
+[06/26/2026-00:52:02] [I] Engine built in 75.4954 sec.
+[06/26/2026-00:52:02] [I] Created engine with size: 295.922 MiB
+[06/26/2026-00:52:02] [I] [TRT] Loaded 7507102 bytes of timing cache from /workspace/scripts/../deploy/artifacts/timing_cache/orin_sm87.cache
+[06/26/2026-00:52:03] [I] [TRT] Serialized 17958 bytes of code generator cache.
+[06/26/2026-00:52:03] [I] [TRT] Serialized 8499894 bytes of compilation cache.
+[06/26/2026-00:52:03] [I] [TRT] Serialized 355 timing cache entries
+[06/26/2026-00:52:03] [I] [TRT] Saved 8554944 bytes of timing cache to /workspace/scripts/../deploy/artifacts/timing_cache/orin_sm87.cache
+[06/26/2026-00:52:04] [I] [TRT] Loaded engine size: 295 MiB
+NvMapMemAllocInternalTagged: 1075072515 error 12
+NvMapMemHandleAlloc: error 0
+NvMapMemAllocInternalTagged: 1075072515 error 12
+NvMapMemHandleAlloc: error 0
+[06/26/2026-00:52:04] [E] Error[1]: [defaultAllocator.cpp::allocate::31] Error Code 1: Cuda Runtime (out of memory)
+[06/26/2026-00:52:04] [W] [TRT] Requested amount of GPU memory (302993312 bytes) could not be allocated. There may not be enough free memory for allocation to succeed.
+[06/26/2026-00:52:04] [E] Error[2]: [myelinResourceManager.cpp::allocate::187] Error Code 2: OutOfMemory (Requested size was 302993312 bytes.)
+[06/26/2026-00:52:04] [E] Engine deserialization failed
+[06/26/2026-00:52:04] [E] Error[4]: IRuntime::deserializeCudaEngine: Error Code 4: API Usage Error (Failed to read header from the stream: read 0 out of 32 bytes.)
+[06/26/2026-00:52:04] [E] Engine deserialization failed
+[06/26/2026-00:52:04] [I] Skipped inference phase since --skipInference is added.
+&&&& PASSED TensorRT.trtexec [TensorRT v100300] # /usr/src/tensorrt/bin/trtexec --onnx=/workspace/scripts/../deploy/artifacts/onnx/chain_modelopt_max_pc_518x518/chain_modelopt_max_pc_518x518_s8_fp16.onnx --saveEngine=/workspace/scripts/../deploy/artifacts/engines/chain_modelopt_max_pc_518x518_s8.trt --stronglyTyped --maxAuxStreams=0 --memPoolSize=workspace:512 --builderOptimizationLevel=3 --skipInference --timingCacheFile=/workspace/scripts/../deploy/artifacts/timing_cache/orin_sm87.cache
+fp16 conversion: 288 initializers, 161 constants, 128 Cast targets → fp16; I/O set to fp16. Wrote /workspace/scripts/../deploy/artifacts/onnx/chain_modelopt_max_pc_518x518/chain_modelopt_max_pc_518x518_s16_fp16.onnx
+=== build INT8 chain engine s16 → /workspace/scripts/../deploy/artifacts/engines/chain_modelopt_max_pc_518x518_s16.trt ===
+&&&& RUNNING TensorRT.trtexec [TensorRT v100300] # /usr/src/tensorrt/bin/trtexec --onnx=/workspace/scripts/../deploy/artifacts/onnx/chain_modelopt_max_pc_518x518/chain_modelopt_max_pc_518x518_s16_fp16.onnx --saveEngine=/workspace/scripts/../deploy/artifacts/engines/chain_modelopt_max_pc_518x518_s16.trt --stronglyTyped --maxAuxStreams=0 --memPoolSize=workspace:512 --builderOptimizationLevel=3 --skipInference --timingCacheFile=/workspace/scripts/../deploy/artifacts/timing_cache/orin_sm87.cache
+[06/26/2026-00:52:09] [I] === Model Options ===
+[06/26/2026-00:52:09] [I] Format: ONNX
+[06/26/2026-00:52:09] [I] Model: /workspace/scripts/../deploy/artifacts/onnx/chain_modelopt_max_pc_518x518/chain_modelopt_max_pc_518x518_s16_fp16.onnx
+[06/26/2026-00:52:09] [I] Output:
+[06/26/2026-00:52:09] [I] === Build Options ===
+[06/26/2026-00:52:09] [I] Memory Pools: workspace: 512 MiB, dlaSRAM: default, dlaLocalDRAM: default, dlaGlobalDRAM: default, tacticSharedMem: default
+[06/26/2026-00:52:09] [I] avgTiming: 8
+[06/26/2026-00:52:09] [I] Precision: Strongly Typed
+[06/26/2026-00:52:09] [I] LayerPrecisions: 
+[06/26/2026-00:52:09] [I] Layer Device Types: 
+[06/26/2026-00:52:09] [I] Calibration: 
+[06/26/2026-00:52:09] [I] Refit: Disabled
+[06/26/2026-00:52:09] [I] Strip weights: Disabled
+[06/26/2026-00:52:09] [I] Version Compatible: Disabled
+[06/26/2026-00:52:09] [I] ONNX Plugin InstanceNorm: Disabled
+[06/26/2026-00:52:09] [I] TensorRT runtime: full
+[06/26/2026-00:52:09] [I] Lean DLL Path: 
+[06/26/2026-00:52:09] [I] Tempfile Controls: { in_memory: allow, temporary: allow }
+[06/26/2026-00:52:09] [I] Exclude Lean Runtime: Disabled
+[06/26/2026-00:52:09] [I] Sparsity: Disabled
+[06/26/2026-00:52:09] [I] Safe mode: Disabled
+[06/26/2026-00:52:09] [I] Build DLA standalone loadable: Disabled
+[06/26/2026-00:52:09] [I] Allow GPU fallback for DLA: Disabled
+[06/26/2026-00:52:09] [I] DirectIO mode: Disabled
+[06/26/2026-00:52:09] [I] Restricted mode: Disabled
+[06/26/2026-00:52:09] [I] Skip inference: Enabled
+[06/26/2026-00:52:09] [I] Save engine: /workspace/scripts/../deploy/artifacts/engines/chain_modelopt_max_pc_518x518_s16.trt
+[06/26/2026-00:52:09] [I] Load engine: 
+[06/26/2026-00:52:09] [I] Profiling verbosity: 0
+[06/26/2026-00:52:09] [I] Tactic sources: Using default tactic sources
+[06/26/2026-00:52:09] [I] timingCacheMode: global
+[06/26/2026-00:52:09] [I] timingCacheFile: /workspace/scripts/../deploy/artifacts/timing_cache/orin_sm87.cache
+[06/26/2026-00:52:09] [I] Enable Compilation Cache: Enabled
+[06/26/2026-00:52:09] [I] errorOnTimingCacheMiss: Disabled
+[06/26/2026-00:52:09] [I] Preview Features: Use default preview flags.
+[06/26/2026-00:52:09] [I] MaxAuxStreams: 0
+[06/26/2026-00:52:09] [I] BuilderOptimizationLevel: 3
+[06/26/2026-00:52:09] [I] Calibration Profile Index: 0
+[06/26/2026-00:52:09] [I] Weight Streaming: Disabled
+[06/26/2026-00:52:09] [I] Runtime Platform: Same As Build
+[06/26/2026-00:52:09] [I] Debug Tensors: 
+[06/26/2026-00:52:09] [I] Input(s)s format: fp32:CHW
+[06/26/2026-00:52:09] [I] Output(s)s format: fp32:CHW
+[06/26/2026-00:52:09] [I] Input build shapes: model
+[06/26/2026-00:52:09] [I] Input calibration shapes: model
+[06/26/2026-00:52:09] [I] === System Options ===
+[06/26/2026-00:52:09] [I] Device: 0
+[06/26/2026-00:52:09] [I] DLACore: 
+[06/26/2026-00:52:09] [I] Plugins:
+[06/26/2026-00:52:09] [I] setPluginsToSerialize:
+[06/26/2026-00:52:09] [I] dynamicPlugins:
+[06/26/2026-00:52:09] [I] ignoreParsedPluginLibs: 0
+[06/26/2026-00:52:09] [I] 
+[06/26/2026-00:52:09] [I] === Inference Options ===
+[06/26/2026-00:52:09] [I] Batch: Explicit
+[06/26/2026-00:52:09] [I] Input inference shapes: model
+[06/26/2026-00:52:09] [I] Iterations: 10
+[06/26/2026-00:52:09] [I] Duration: 3s (+ 200ms warm up)
+[06/26/2026-00:52:09] [I] Sleep time: 0ms
+[06/26/2026-00:52:09] [I] Idle time: 0ms
+[06/26/2026-00:52:09] [I] Inference Streams: 1
+[06/26/2026-00:52:09] [I] ExposeDMA: Disabled
+[06/26/2026-00:52:09] [I] Data transfers: Enabled
+[06/26/2026-00:52:09] [I] Spin-wait: Disabled
+[06/26/2026-00:52:09] [I] Multithreading: Disabled
+[06/26/2026-00:52:09] [I] CUDA Graph: Disabled
+[06/26/2026-00:52:09] [I] Separate profiling: Disabled
+[06/26/2026-00:52:09] [I] Time Deserialize: Disabled
+[06/26/2026-00:52:09] [I] Time Refit: Disabled
+[06/26/2026-00:52:09] [I] NVTX verbosity: 0
+[06/26/2026-00:52:09] [I] Persistent Cache Ratio: 0
+[06/26/2026-00:52:09] [I] Optimization Profile Index: 0
+[06/26/2026-00:52:09] [I] Weight Streaming Budget: 100.000000%
+[06/26/2026-00:52:09] [I] Inputs:
+[06/26/2026-00:52:09] [I] Debug Tensor Save Destinations:
+[06/26/2026-00:52:09] [I] === Reporting Options ===
+[06/26/2026-00:52:09] [I] Verbose: Disabled
+[06/26/2026-00:52:09] [I] Averages: 10 inferences
+[06/26/2026-00:52:09] [I] Percentiles: 90,95,99
+[06/26/2026-00:52:09] [I] Dump refittable layers:Disabled
+[06/26/2026-00:52:09] [I] Dump output: Disabled
+[06/26/2026-00:52:09] [I] Profile: Disabled
+[06/26/2026-00:52:09] [I] Export timing to JSON file: 
+[06/26/2026-00:52:09] [I] Export output to JSON file: 
+[06/26/2026-00:52:09] [I] Export profile to JSON file: 
+[06/26/2026-00:52:09] [I] 
+[06/26/2026-00:52:09] [I] === Device Information ===
+[06/26/2026-00:52:09] [I] Available Devices: 
+[06/26/2026-00:52:09] [I]   Device 0: "Orin" UUID: GPU-6c696d3f-23e3-50ba-ae8d-24ba698cf3a0
+[06/26/2026-00:52:09] [I] Selected Device: Orin
+[06/26/2026-00:52:09] [I] Selected Device ID: 0
+[06/26/2026-00:52:09] [I] Selected Device UUID: GPU-6c696d3f-23e3-50ba-ae8d-24ba698cf3a0
+[06/26/2026-00:52:09] [I] Compute Capability: 8.7
+[06/26/2026-00:52:09] [I] SMs: 8
+[06/26/2026-00:52:09] [I] Device Global Memory: 7619 MiB
+[06/26/2026-00:52:09] [I] Shared Memory per SM: 164 KiB
+[06/26/2026-00:52:09] [I] Memory Bus Width: 128 bits (ECC disabled)
+[06/26/2026-00:52:09] [I] Application Compute Clock Rate: 1.02 GHz
+[06/26/2026-00:52:09] [I] Application Memory Clock Rate: 0.612 GHz
+[06/26/2026-00:52:09] [I] 
+[06/26/2026-00:52:09] [I] Note: The application clock rates do not reflect the actual clock rates that the GPU is currently running at.
+[06/26/2026-00:52:09] [I] 
+[06/26/2026-00:52:09] [I] TensorRT version: 10.3.0
+[06/26/2026-00:52:09] [I] Loading standard plugins
+[06/26/2026-00:52:09] [I] [TRT] [MemUsageChange] Init CUDA: CPU +2, GPU +0, now: CPU 31, GPU 1757 (MiB)
+[06/26/2026-00:52:11] [I] [TRT] [MemUsageChange] Init builder kernel library: CPU +928, GPU +713, now: CPU 1002, GPU 2515 (MiB)
+[06/26/2026-00:52:11] [I] Start parsing network model.
+[06/26/2026-00:52:11] [I] [TRT] ----------------------------------------------------------------
+[06/26/2026-00:52:11] [I] [TRT] Input filename:   /workspace/scripts/../deploy/artifacts/onnx/chain_modelopt_max_pc_518x518/chain_modelopt_max_pc_518x518_s16_fp16.onnx
+[06/26/2026-00:52:11] [I] [TRT] ONNX IR version:  0.0.8
+[06/26/2026-00:52:11] [I] [TRT] Opset version:    17
+[06/26/2026-00:52:11] [I] [TRT] Producer name:    pytorch
+[06/26/2026-00:52:11] [I] [TRT] Producer version: 2.7.0
+[06/26/2026-00:52:11] [I] [TRT] Domain:           
+[06/26/2026-00:52:11] [I] [TRT] Model version:    0
+[06/26/2026-00:52:11] [I] [TRT] Doc string:       
+[06/26/2026-00:52:11] [I] [TRT] ----------------------------------------------------------------
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 6) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 27) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 34) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 519) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 555) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 576) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 583) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 1067) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 1103) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 1124) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 1131) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 1613) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 1649) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 1670) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 1677) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 2159) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 2195) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 2216) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 2223) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 2705) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 2741) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 2762) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 2769) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 3251) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 3287) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 3308) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 3315) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 3797) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 3833) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 3854) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 3861) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 4343) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 4379) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 4400) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 4407) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 4889) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 4925) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 4946) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 4953) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 5435) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 5471) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 5492) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 5499) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 5981) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 6017) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 6038) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 6045) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 6527) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 6563) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 6584) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 6591) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 7073) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 7109) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 7130) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:11] [W] [TRT] (Unnamed Layer* 7137) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:12] [W] [TRT] (Unnamed Layer* 7619) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:12] [W] [TRT] (Unnamed Layer* 7655) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:12] [W] [TRT] (Unnamed Layer* 7676) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:12] [W] [TRT] (Unnamed Layer* 7683) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:12] [W] [TRT] (Unnamed Layer* 8165) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:12] [W] [TRT] (Unnamed Layer* 8201) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:12] [W] [TRT] (Unnamed Layer* 8222) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:12] [W] [TRT] (Unnamed Layer* 8229) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:12] [W] [TRT] (Unnamed Layer* 8711) [Normalization]: setComputePrecision ignored for strongly typed network.
+[06/26/2026-00:52:12] [I] Finished parsing network model. Parse time: 0.614863
+[06/26/2026-00:52:12] [I] [TRT] Loaded 8554944 bytes of timing cache from /workspace/scripts/../deploy/artifacts/timing_cache/orin_sm87.cache
+[06/26/2026-00:52:12] [I] [TRT] Global timing cache in use. Profiling results in this builder pass will be stored.
+[06/26/2026-00:52:25] [I] [TRT] Detected 1 inputs and 1 output network tensors.
+[06/26/2026-00:52:25] [I] [TRT] Total Host Persistent Memory: 32
+[06/26/2026-00:52:25] [I] [TRT] Total Device Persistent Memory: 0
+[06/26/2026-00:52:25] [I] [TRT] Total Scratch Memory: 309541376
+[06/26/2026-00:52:25] [I] [TRT] [BlockAssignment] Started assigning block shifts. This will take 1 steps to complete.
+[06/26/2026-00:52:25] [I] [TRT] [BlockAssignment] Algorithm ShiftNTopDown took 0.030785ms to assign 1 blocks to 1 nodes requiring 309541376 bytes.
+[06/26/2026-00:52:25] [I] [TRT] Total Activation Memory: 309541376
+NvMapMemAllocInternalTagged: 1075072515 error 12
+NvMapMemHandleAlloc: error 0
+NvMapMemAllocInternalTagged: 1075072515 error 12
+NvMapMemHandleAlloc: error 0
+[06/26/2026-00:52:26] [E] Error[1]: [resizingAllocator.cpp::allocate::75] Error Code 1: Cuda Runtime (out of memory)
+[06/26/2026-00:52:26] [W] [TRT] Requested amount of GPU memory (403263392 bytes) could not be allocated. There may not be enough free memory for allocation to succeed.
+[06/26/2026-00:52:26] [E] Error[2]: [myelinResourceManager.cpp::allocate::187] Error Code 2: OutOfMemory (Requested size was 403263392 bytes.)
+[06/26/2026-00:52:26] [E] Engine could not be created from network
+[06/26/2026-00:52:26] [E] Building engine failed
+[06/26/2026-00:52:26] [E] Failed to create engine from model or file.
+[06/26/2026-00:52:26] [E] Engine set up failed
+&&&& FAILED TensorRT.trtexec [TensorRT v100300] # /usr/src/tensorrt/bin/trtexec --onnx=/workspace/scripts/../deploy/artifacts/onnx/chain_modelopt_max_pc_518x518/chain_modelopt_max_pc_518x518_s16_fp16.onnx --saveEngine=/workspace/scripts/../deploy/artifacts/engines/chain_modelopt_max_pc_518x518_s16.trt --stronglyTyped --maxAuxStreams=0 --memPoolSize=workspace:512 --builderOptimizationLevel=3 --skipInference --timingCacheFile=/workspace/scripts/../deploy/artifacts/timing_cache/orin_sm87.cache
+Traceback (most recent call last):
+  File "/workspace/scripts/bench_trt_modelopt_chain.py", line 111, in <module>
+    main()
+  File "/workspace/scripts/bench_trt_modelopt_chain.py", line 94, in main
+    subprocess.run([trtexec, f"--onnx={fp16}", f"--saveEngine={eng}", "--stronglyTyped",
+  File "/usr/lib/python3.10/subprocess.py", line 526, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/usr/src/tensorrt/bin/trtexec', '--onnx=/workspace/scripts/../deploy/artifacts/onnx/chain_modelopt_max_pc_518x518/chain_modelopt_max_pc_518x518_s16_fp16.onnx', '--saveEngine=/workspace/scripts/../deploy/artifacts/engines/chain_modelopt_max_pc_518x518_s16.trt', '--stronglyTyped', '--maxAuxStreams=0', '--memPoolSize=workspace:512', '--builderOptimizationLevel=3', '--skipInference', '--timingCacheFile=/workspace/scripts/../deploy/artifacts/timing_cache/orin_sm87.cache']' returned non-zero exit status 1.
+=== [00:52:26] config4 (hybrid INT8) FAILED ===
+=== [00:52:26] Export fp16 aggregator slice s0 @518 (CPU) ===
+2026-06-26 00:52:31,531 - src_logger - INFO - Loading pose model on CPU (fp32) for slice export ...
+2026-06-26 00:52:34,493 - src_logger - INFO - Loaded pose model — missing: 0, unexpected: 0 (depth/point/track keys expected as unexpected)
+2026-06-26 00:52:34,512 - src_logger - INFO - Running embed_tokens (DINO, CPU, 10 frame[s]) ...
+2026-06-26 00:59:52,705 - src_logger - INFO - Exporting slice pairs[0:8] is_last=False in=(10, 1374, 1024) → deploy/artifacts/onnx/chain_f10_518_s0/chain_f10_518_s0.onnx ...
+/workspace/scripts/../src/models/depth/vggt/vggt/models/aggregator.py:321: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  if tokens.shape != (B * S, P, C):
+/workspace/scripts/../src/models/depth/vggt/vggt/models/aggregator.py:328: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  if pos is not None and pos.shape != (B * S, P, 2):
+/workspace/scripts/../src/models/depth/vggt/vggt/layers/rope.py:176: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  assert tokens.size(-1) % 2 == 0, "Feature dimension must be even"
+/workspace/scripts/../src/models/depth/vggt/vggt/layers/rope.py:177: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  assert positions.ndim == 3 and positions.shape[-1] == 2, "Positions must have shape (batch_size, n_tokens, 2)"
+/workspace/scripts/../src/models/depth/vggt/vggt/layers/rope.py:183: TracerWarning: Converting a tensor to a Python integer might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  max_position = int(positions.max()) + 1
+/workspace/scripts/../src/models/depth/vggt/vggt/models/aggregator.py:348: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  if tokens.shape != (B, S * P, C):
+/workspace/scripts/../src/models/depth/vggt/vggt/models/aggregator.py:356: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  if pos is not None and pos.shape != (B, S * P, 2):
+2026-06-26 01:16:45,103 - src_logger - INFO - Slice export done.
+2026-06-26 01:16:45,364 - src_logger - INFO - Validating deploy/artifacts/onnx/chain_f10_518_s0/chain_f10_518_s0.onnx (subprocess) ...
+2026-06-26 01:16:50,803 - src_logger - INFO - ONNX validation passed: deploy/artifacts/onnx/chain_f10_518_s0/chain_f10_518_s0.onnx
+fp16 conversion: 288 initializers, 161 constants, 128 Cast targets → fp16; I/O set to fp16. Wrote deploy/artifacts/onnx/chain_f10_518_s0_fp16/chain_f10_518_s0_fp16.onnx
+=== [01:16:57] trtexec build chain_f10_518_s0 ===
+=== [01:17:17] Export fp16 aggregator slice s8 @518 (CPU) ===
+2026-06-26 01:17:22,353 - src_logger - INFO - Loading pose model on CPU (fp32) for slice export ...
+2026-06-26 01:17:25,541 - src_logger - INFO - Loaded pose model — missing: 0, unexpected: 0 (depth/point/track keys expected as unexpected)
+2026-06-26 01:17:25,561 - src_logger - INFO - Running embed_tokens (DINO, CPU, 10 frame[s]) ...
+2026-06-26 01:25:15,912 - src_logger - INFO - Exporting slice pairs[8:16] is_last=False in=(10, 1374, 1024) → deploy/artifacts/onnx/chain_f10_518_s8/chain_f10_518_s8.onnx ...
+/workspace/scripts/../src/models/depth/vggt/vggt/models/aggregator.py:321: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  if tokens.shape != (B * S, P, C):
+/workspace/scripts/../src/models/depth/vggt/vggt/models/aggregator.py:328: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  if pos is not None and pos.shape != (B * S, P, 2):
+/workspace/scripts/../src/models/depth/vggt/vggt/layers/rope.py:176: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  assert tokens.size(-1) % 2 == 0, "Feature dimension must be even"
+/workspace/scripts/../src/models/depth/vggt/vggt/layers/rope.py:177: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  assert positions.ndim == 3 and positions.shape[-1] == 2, "Positions must have shape (batch_size, n_tokens, 2)"
+/workspace/scripts/../src/models/depth/vggt/vggt/layers/rope.py:183: TracerWarning: Converting a tensor to a Python integer might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  max_position = int(positions.max()) + 1
+/workspace/scripts/../src/models/depth/vggt/vggt/models/aggregator.py:348: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  if tokens.shape != (B, S * P, C):
+/workspace/scripts/../src/models/depth/vggt/vggt/models/aggregator.py:356: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  if pos is not None and pos.shape != (B, S * P, 2):
+2026-06-26 01:42:40,196 - src_logger - INFO - Slice export done.
+2026-06-26 01:42:40,500 - src_logger - INFO - Validating deploy/artifacts/onnx/chain_f10_518_s8/chain_f10_518_s8.onnx (subprocess) ...
+2026-06-26 01:42:46,563 - src_logger - INFO - ONNX validation passed: deploy/artifacts/onnx/chain_f10_518_s8/chain_f10_518_s8.onnx
+fp16 conversion: 288 initializers, 161 constants, 128 Cast targets → fp16; I/O set to fp16. Wrote deploy/artifacts/onnx/chain_f10_518_s8_fp16/chain_f10_518_s8_fp16.onnx
+=== [01:42:52] trtexec build chain_f10_518_s8 ===
+=== [01:43:13] Export fp16 aggregator slice s16 @518 (CPU) ===
+2026-06-26 01:43:18,182 - src_logger - INFO - Loading pose model on CPU (fp32) for slice export ...
+2026-06-26 01:43:21,181 - src_logger - INFO - Loaded pose model — missing: 0, unexpected: 0 (depth/point/track keys expected as unexpected)
+2026-06-26 01:43:21,199 - src_logger - INFO - Running embed_tokens (DINO, CPU, 10 frame[s]) ...
+2026-06-26 01:50:53,610 - src_logger - INFO - Exporting slice pairs[16:24] is_last=True in=(10, 1374, 1024) → deploy/artifacts/onnx/chain_f10_518_s16/chain_f10_518_s16.onnx ...
+/workspace/scripts/../src/models/depth/vggt/vggt/models/aggregator.py:321: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  if tokens.shape != (B * S, P, C):
+/workspace/scripts/../src/models/depth/vggt/vggt/models/aggregator.py:328: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  if pos is not None and pos.shape != (B * S, P, 2):
+/workspace/scripts/../src/models/depth/vggt/vggt/layers/rope.py:176: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  assert tokens.size(-1) % 2 == 0, "Feature dimension must be even"
+/workspace/scripts/../src/models/depth/vggt/vggt/layers/rope.py:177: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  assert positions.ndim == 3 and positions.shape[-1] == 2, "Positions must have shape (batch_size, n_tokens, 2)"
+/workspace/scripts/../src/models/depth/vggt/vggt/layers/rope.py:183: TracerWarning: Converting a tensor to a Python integer might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  max_position = int(positions.max()) + 1
+/workspace/scripts/../src/models/depth/vggt/vggt/models/aggregator.py:348: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  if tokens.shape != (B, S * P, C):
+/workspace/scripts/../src/models/depth/vggt/vggt/models/aggregator.py:356: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  if pos is not None and pos.shape != (B, S * P, 2):
+2026-06-26 02:07:49,291 - src_logger - INFO - Slice export done.
+2026-06-26 02:07:49,659 - src_logger - INFO - Validating deploy/artifacts/onnx/chain_f10_518_s16/chain_f10_518_s16.onnx (subprocess) ...
+2026-06-26 02:07:54,847 - src_logger - INFO - ONNX validation passed: deploy/artifacts/onnx/chain_f10_518_s16/chain_f10_518_s16.onnx
+fp16 conversion: 288 initializers, 161 constants, 128 Cast targets → fp16; I/O set to fp16. Wrote deploy/artifacts/onnx/chain_f10_518_s16_fp16/chain_f10_518_s16_fp16.onnx
+=== [02:08:00] trtexec build chain_f10_518_s16 ===
+=== [02:08:21] Config 2: Hybrid fp16 @518 (eval_chain) ===
+2026-06-26 02:08:28,724 - src_logger - INFO - [Hybrid TRT fp16 @518] evaluating 3-engine chain → /workspace/scripts/../deploy/artifacts/results/eval_results_trt_chain_fp16_518.json
+2026-06-26 02:08:37,501 - src_logger - INFO - Pre-allocating model pool: 2700 MB (kept alive) ...
+2026-06-26 02:08:38,335 - src_logger - INFO - Pre-allocating activation pool: 1600 MB (separate NvMap segments — model pool still alive) ...
+2026-06-26 02:08:39,087 - src_logger - INFO - Pools ready: model 2700 MB + activation 1600 MB  | CUDA free: 1632 MB
+2026-06-26 02:08:40,586 - src_logger - INFO - Streaming checkpoint (torch.float16) from data3/rogelio/model_zoo/vggt/vggt_1B_commercial.pt ...
+2026-06-26 02:09:54,641 - src_logger - INFO - Loaded — missing: 0, unexpected: 0
+2026-06-26 02:09:57,461 - src_logger - INFO - Activation pool released: 1600 MB contiguous free for inference  | CUDA allocated: 2397 MB
+NvMap defrag: reserved+freed 2195 MB contiguous before engine load.
+TRT engine loaded: /workspace/scripts/../deploy/artifacts/engines/chain_f10_518_s0.trt
+  Inputs:  ['tokens']
+  Outputs: ['tokens_out']
+TRT engine loaded: /workspace/scripts/../deploy/artifacts/engines/chain_f10_518_s8.trt
+  Inputs:  ['tokens']
+  Outputs: ['tokens_out']
+NvMapMemAllocInternalTagged: 1075072515 error 12
+NvMapMemHandleAlloc: error 0
+NvMapMemAllocInternalTagged: 1075072515 error 12
+NvMapMemHandleAlloc: error 0
+[06/26/2026-02:10:01] [TRT] [E] [defaultAllocator.cpp::allocate::31] Error Code 1: Cuda Runtime (out of memory)
+[06/26/2026-02:10:01] [TRT] [W] Requested amount of GPU memory (309541376 bytes) could not be allocated. There may not be enough free memory for allocation to succeed.
+[06/26/2026-02:10:01] [TRT] [E] [executionContext.cpp::ExecutionContext::565] Error Code 2: OutOfMemory (Requested size was 309541376 bytes.)
+TRT engine loaded: /workspace/scripts/../deploy/artifacts/engines/chain_f10_518_s16.trt
+  Inputs:  ['tokens']
+  Outputs: ['last_tokens']
+TRT chain: 3 sub-engines (['chain_f10_518_s0.trt', 'chain_f10_518_s8.trt', 'chain_f10_518_s16.trt'])
+2026-06-26 02:10:01,829 - src_logger - INFO - [Jetson] Detected 7.4 GB VRAM — using DPT frames_chunk_size=2 (vs default 8) to fit 10-frame activations in unified memory.
+2026-06-26 02:10:01,830 - src_logger - INFO - Evaluation dtype: torch.float16 (Jetson 7.4 GB — matching model dtype, avoids BF16 cast overhead)
+2026-06-26 02:10:01,844 - src_logger - INFO - Model weight memory: 993 MB
+2026-06-26 02:10:01,845 - src_logger - INFO - Warming up CUDA kernels (1 synthetic forward pass) ...
+Traceback (most recent call last):
+  File "<stdin>", line 4, in <module>
+  File "/workspace/scripts/_trt_bench_common.py", line 237, in eval_chain
+    run_evaluation_vggt(model, model_path=label, results_path=results_path,
+  File "/workspace/scripts/../deploy/runtime/../../src/models/depth/qvggt.py", line 85, in run_evaluation_vggt
+    model(_dummy, frames_chunk_size=frames_chunk_size)
+  File "/usr/local/lib/python3.10/dist-packages/torch/nn/modules/module.py", line 1751, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/usr/local/lib/python3.10/dist-packages/torch/nn/modules/module.py", line 1762, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/scripts/../deploy/runtime/trt_inference.py", line 391, in forward
+    last = self.engines[-1].infer({"tokens": tokens})[self._out_names[-1]]
+  File "/workspace/scripts/../deploy/runtime/trt_inference.py", line 196, in infer
+    self.context.set_input_shape(name, shape)
+AttributeError: 'NoneType' object has no attribute 'set_input_shape'
+=== [02:10:12] config2 (hybrid fp16) FAILED ===
+=== [02:10:12] Export DINO @518 (--no_fused_attn, CPU) ===
+2026-06-26 02:10:16,949 - src_logger - INFO - Loading pose model on CPU (fp32) for 2-chunk DINO export ...
+2026-06-26 02:10:19,898 - src_logger - INFO - Loaded pose model — missing: 0, unexpected: 0 (depth/point/track keys expected as unexpected)
+2026-06-26 02:10:19,913 - src_logger - INFO - Disabled fused_attn (SDPA→manual) on 24 attention module(s) for export.
+2026-06-26 02:10:19,930 - src_logger - INFO - Exporting DINO chunk 0 blocks[0:12] is_first=True is_last=False in=(1, 10, 3, 518, 518) → deploy/artifacts/onnx/dino_split_518/dino_split_518_0.onnx ...
+/workspace/scripts/../src/models/depth/vggt/vggt/layers/patch_embed.py:69: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  assert H % patch_H == 0, f"Input image height {H} is not a multiple of patch height {patch_H}"
+/workspace/scripts/../src/models/depth/vggt/vggt/layers/patch_embed.py:70: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  assert W % patch_W == 0, f"Input image width {W} is not a multiple of patch width: {patch_W}"
+/workspace/scripts/../src/models/depth/vggt/vggt/layers/vision_transformer.py:184: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  if npatch == N and w == h:
+2026-06-26 02:11:38,713 - src_logger - INFO - Validating deploy/artifacts/onnx/dino_split_518/dino_split_518_0.onnx (subprocess) ...
+2026-06-26 02:11:42,972 - src_logger - INFO - ONNX validation passed: deploy/artifacts/onnx/dino_split_518/dino_split_518_0.onnx
+2026-06-26 02:12:47,590 - src_logger - INFO - Exporting DINO chunk 1 blocks[12:24] is_first=False is_last=True in=(10, 1374, 1024) → deploy/artifacts/onnx/dino_split_518/dino_split_518_1.onnx ...
+2026-06-26 02:14:00,803 - src_logger - INFO - Validating deploy/artifacts/onnx/dino_split_518/dino_split_518_1.onnx (subprocess) ...
+2026-06-26 02:14:04,989 - src_logger - INFO - ONNX validation passed: deploy/artifacts/onnx/dino_split_518/dino_split_518_1.onnx
+2026-06-26 02:15:09,930 - src_logger - INFO - Exported 2 DINO chunk ONNX graphs (deploy/artifacts/onnx/dino_split_518/dino_split_518_0..1.onnx).
+fp16 conversion: 173 initializers, 50 constants, 0 Cast targets → fp16; I/O set to fp16. Wrote deploy/artifacts/onnx/dino_0_nofuse_518_fp16/dino_0_nofuse_518_fp16.onnx
+=== [02:15:15] trtexec build dino_0_nofuse_518 ===
+fp16 conversion: 174 initializers, 48 constants, 0 Cast targets → fp16; I/O set to fp16. Wrote deploy/artifacts/onnx/dino_1_nofuse_518_fp16/dino_1_nofuse_518_fp16.onnx
+=== [02:16:41] trtexec build dino_1_nofuse_518 ===
+=== [02:17:10] Export camera_head @518 (CPU) ===
+2026-06-26 02:17:15,788 - src_logger - INFO - Loading pose model on CPU (fp32) for camera-head export ...
+2026-06-26 02:17:18,820 - src_logger - INFO - Loaded pose model — missing: 0, unexpected: 0 (depth/point/track keys expected as unexpected)
+2026-06-26 02:18:32,161 - src_logger - INFO - Exporting camera-head ONNX (opset 17) last_tokens=(1, 10, 1374, 2048) → deploy/artifacts/onnx/camera_head_518/camera_head_518.onnx ...
+2026-06-26 02:19:07,604 - src_logger - INFO - Camera-head export done.
+2026-06-26 02:19:07,889 - src_logger - INFO - Validating deploy/artifacts/onnx/camera_head_518/camera_head_518.onnx (subprocess) ...
+2026-06-26 02:19:13,733 - src_logger - INFO - ONNX validation passed: deploy/artifacts/onnx/camera_head_518/camera_head_518.onnx
+fp16 conversion: 69 initializers, 82 constants, 32 Cast targets → fp16; I/O set to fp16. Wrote deploy/artifacts/onnx/camera_head_518_fp16/camera_head_518_fp16.onnx
+=== [02:19:20] trtexec build camera_head_518 ===
+=== [02:19:45] Config 5: Full all-TRT INT8 @518 ===
+missing engines (build them first):
+  /workspace/scripts/../deploy/artifacts/engines/chain_modelopt_max_pc_518x518_s16.trt
+=== [02:19:45] config5 (full INT8) FAILED (likely memory @518) ===
+=== [02:19:45] Config 3: Full all-TRT fp16 @518 ===
+2026-06-26 02:19:52,860 - src_logger - INFO - [Full TRT fp16 @518] evaluating 6-engine all-TRT path → deploy/artifacts/results/eval_results_trt_fulltrt_fp16_518.json
+NvMap defrag: reserved+freed 2944 MB before engine load.
+TRT engine loaded: /workspace/scripts/../deploy/artifacts/engines/dino_0_nofuse_518.trt
+  Inputs:  ['images']
+  Outputs: ['hidden_out']
+TRT engine loaded: /workspace/scripts/../deploy/artifacts/engines/dino_1_nofuse_518.trt
+  Inputs:  ['hidden_in']
+  Outputs: ['tokens']
+TRT engine loaded: /workspace/scripts/../deploy/artifacts/engines/chain_f10_518_s0.trt
+  Inputs:  ['tokens']
+  Outputs: ['tokens_out']
+TRT engine loaded: /workspace/scripts/../deploy/artifacts/engines/chain_f10_518_s8.trt
+  Inputs:  ['tokens']
+  Outputs: ['tokens_out']
+TRT engine loaded: /workspace/scripts/../deploy/artifacts/engines/chain_f10_518_s16.trt
+  Inputs:  ['tokens']
+  Outputs: ['last_tokens']
+TRT engine loaded: /workspace/scripts/../deploy/artifacts/engines/camera_head_518.trt
+  Inputs:  ['last_tokens']
+  Outputs: ['pose_enc']
+TRT all-engine chain: 6 engines, shared scratch 295 MB (['dino_0_nofuse_518.trt', 'dino_1_nofuse_518.trt', 'chain_f10_518_s0.trt', 'chain_f10_518_s8.trt', 'chain_f10_518_s16.trt', 'camera_head_518.trt'])
+2026-06-26 02:19:58,236 - src_logger - INFO - [Jetson] Detected 7.4 GB VRAM — using DPT frames_chunk_size=2 (vs default 8) to fit 10-frame activations in unified memory.
+2026-06-26 02:19:58,237 - src_logger - INFO - Evaluation dtype: torch.float16 (Jetson 7.4 GB — matching model dtype, avoids BF16 cast overhead)
+2026-06-26 02:19:58,244 - src_logger - INFO - Model weight memory: 0 MB
+2026-06-26 02:19:58,244 - src_logger - INFO - Warming up CUDA kernels (1 synthetic forward pass) ...
+NvMapMemAllocInternalTagged: 1075072515 error 12
+NvMapMemHandleAlloc: error 0
+NvMapMemAllocInternalTagged: 1075072515 error 12
+NvMapMemHandleAlloc: error 0
+NvMapMemAllocInternalTagged: 1075072515 error 12
+NvMapMemHandleAlloc: error 0
+NvMapMemAllocInternalTagged: 1075072515 error 12
+NvMapMemHandleAlloc: error 0
+Traceback (most recent call last):
+  File "/workspace/scripts/bench_trt_fulltrt.py", line 63, in <module>
+    main()
+  File "/workspace/scripts/bench_trt_fulltrt.py", line 57, in main
+    C.eval_all_engines(engine_paths, results, label=args.label,
+  File "/workspace/scripts/_trt_bench_common.py", line 138, in eval_all_engines
+    run_evaluation_vggt(model, model_path=label, results_path=results_path,
+  File "/workspace/scripts/../deploy/runtime/../../src/models/depth/qvggt.py", line 85, in run_evaluation_vggt
+    model(_dummy, frames_chunk_size=frames_chunk_size)
+  File "/usr/local/lib/python3.10/dist-packages/torch/nn/modules/module.py", line 1751, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/usr/local/lib/python3.10/dist-packages/torch/nn/modules/module.py", line 1762, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/scripts/../deploy/runtime/trt_inference.py", line 510, in forward
+    x = eng.infer({in_name: x})[out_name]   # numpy host array, fed straight on
+  File "/workspace/scripts/../deploy/runtime/trt_inference.py", line 213, in infer
+    self._alloc_buffer(name, out_shape)
+  File "/workspace/scripts/../deploy/runtime/trt_inference.py", line 171, in _alloc_buffer
+    device = cuda.mem_alloc(nbytes)
+pycuda._driver.MemoryError: cuMemAlloc failed: out of memory
+=== [02:20:01] config3 (full fp16) FAILED (likely memory @518) ===
+=== [02:20:01] Aggregating comparison table ===
+# VGGT TensorRT comparison (pose-only, Jetson Orin Nano)
+
+Memory = TRT engine size for TRT rows, weight memory for PyTorch rows. Speedup/Mem× are vs the PyTorch FP16 baseline. GPU (ms) is trtexec `--noDataTransfers` pure compute (TRT rows only).
+
+| Approach | Prec | Mem (MB) | Latency (ms/seq) | p90 (ms) | p99 (ms) | GPU (ms) | AUC@30 | Speedup× | Mem× |
+|---|---|---|---|---|---|---|---|---|---|
+| PyTorch FP16 (baseline) | fp16 | 2396 | 15232.3 | 15362.5 | 15391.8 | — | 0.8126 | 1.0 | 1.0 |
+| eval_results_chain_cmp_apple2.json | ? | 1171.6 | 6166.9 | 6313.3 | 6346.2 | — | 0.653 | 2.47 | 2.05 |
+| eval_results_chain_f10_c8.json | ? | 1171.6 | 6133.5 | 6199.9 | 6214.9 | — | 0.653 | 2.48 | 2.05 |
+| eval_results_pose_only.json | ? | 2146 | 12904.2 | 13131.8 | 13183.1 | — | 0.8144 | 1.18 | 1.12 |
+| eval_results_torch_350x518.json | ? | 2146 | 8549.0 | 8677.1 | 8705.9 | — | 0.6537 | 1.78 | 1.12 |
+| eval_results_torch_518x518.json | ? | 2146 | 12670.6 | 12758.3 | 12778.1 | — | 0.8126 | 1.2 | 1.12 |
+| eval_results_trt_fulltrt_final.json | ? | 2176.8 | 5546.8 | 5750.5 | 5796.3 | — | 0.6533 | 2.75 | 1.1 |
+| eval_results_trt_fulltrt_fp16.json | ? | 2169.9 | 9681.7 | 9896.5 | 9944.9 | — | 0.1748 | 1.57 | 1.1 |
+| eval_results_trt_fulltrt_nofuse.json | ? | 2176.8 | 5578.9 | 5791.4 | 5839.2 | — | 0.6515 | 2.73 | 1.1 |
+| eval_results_trt_modelopt_pc_max.json | ? | 1029.6 | 6136.2 | 6307.2 | 6345.7 | — | 0.6507 | 2.48 | 2.33 |
+
+Wrote deploy/artifacts/results/comparison.md and deploy/artifacts/results/comparison.csv
+=== [02:20:01] ALL DONE — see deploy/artifacts/results/comparison.md ===

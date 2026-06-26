@@ -1,4 +1,6 @@
 import os
+import json
+import datetime
 import argparse
 from src.logger import logger
 
@@ -27,8 +29,17 @@ def _default_dpt_chunk():
             return 2
     return 8
 
-def run_evaluation_vggt(model, model_path=None, frames_chunk_size=None):
-    """Main function to evaluate VGGT on CO3D dataset. Original vggt/evaluation/test_co3d.py"""
+def run_evaluation_vggt(model, model_path=None, frames_chunk_size=None, results_path=None,
+                        categories=None, max_seqs=None, num_frames=10):
+    """Main function to evaluate VGGT on CO3D dataset. Original vggt/evaluation/test_co3d.py
+
+    categories: optional list of category names to restrict evaluation to (e.g.
+        ["apple"]) for a fast memory/latency estimate. None → all 41 categories.
+    max_seqs:   optional cap on sequences evaluated per category (None → all).
+    num_frames: frames sampled per sequence. MUST match the frame count a fixed-shape
+        TRT engine was built for (e.g. 6 for a 6-frame engine), else the token shape
+        won't match the engine's `tokens` binding.
+    """
     if frames_chunk_size is None:
         frames_chunk_size = _default_dpt_chunk()
     else:
@@ -38,7 +49,7 @@ def run_evaluation_vggt(model, model_path=None, frames_chunk_size=None):
     args.use_ba = False
     args.fast_eval = False
     args.min_num_images = 50
-    args.num_frames = 10
+    args.num_frames = num_frames
     args.co3d_dir = "data3/rogelio/co3d/dataset/"
     args.co3d_anno_dir = "data3/rogelio/co3d/preprocessed_dataset"
     args.seed = 0
@@ -60,6 +71,22 @@ def run_evaluation_vggt(model, model_path=None, frames_chunk_size=None):
     # Set random seeds
     set_random_seeds(args.seed)
 
+    # Record model weight memory before any forward pass.
+    weight_mem_mb = torch.cuda.memory_allocated() // (1024 ** 2)
+    logger.info(f"Model weight memory: {weight_mem_mb} MB")
+
+    # Warmup: one synthetic forward pass using real evaluation dimensions
+    # (350×518, patch_size=14 → 25×37 patches, 10 frames).
+    # Triggers cuDNN algorithm selection and CUDA kernel JIT compilation so
+    # the first timed sequence is not inflated by one-time setup costs.
+    logger.info("Warming up CUDA kernels (1 synthetic forward pass) ...")
+    _dummy = torch.zeros(1, args.num_frames, 3, 350, 518, dtype=dtype, device=device)
+    with torch.inference_mode():
+        model(_dummy, frames_chunk_size=frames_chunk_size)
+    del _dummy
+    torch.cuda.reset_peak_memory_stats()
+    logger.info("Warmup done. Resetting peak memory stats — timing starts now.")
+
     # Categories to evaluate
     SEEN_CATEGORIES = [
         "apple", "backpack", "banana", "baseballbat", "baseballglove",
@@ -75,7 +102,19 @@ def run_evaluation_vggt(model, model_path=None, frames_chunk_size=None):
     if args.debug:
         SEEN_CATEGORIES = ["parkingmeter"]
 
+    if categories:
+        requested = [c for c in categories if c in SEEN_CATEGORIES]
+        missing = [c for c in categories if c not in SEEN_CATEGORIES]
+        if missing:
+            logger.info(f"Ignoring unknown categories: {missing}")
+        SEEN_CATEGORIES = requested or SEEN_CATEGORIES
+        logger.info(f"Restricting evaluation to categories: {SEEN_CATEGORIES}")
+    if max_seqs:
+        logger.info(f"Capping evaluation to {max_seqs} sequence(s) per category")
+
     per_category_results = {}
+    _seq_times = []
+    _eval_start = __import__("time").perf_counter()
 
     for category in SEEN_CATEGORIES:
         logger.info(f"Loading annotation for {category} test set")
@@ -95,6 +134,8 @@ def run_evaluation_vggt(model, model_path=None, frames_chunk_size=None):
         if args.fast_eval and len(seq_names)>=10:
             seq_names = random.sample(seq_names, 10)
         seq_names = sorted(seq_names)
+        if max_seqs:
+            seq_names = seq_names[:max_seqs]
 
 
         logger.info("Testing Sequences: ")
@@ -108,6 +149,16 @@ def run_evaluation_vggt(model, model_path=None, frames_chunk_size=None):
                 logger.info(f"Skipping {seq_name} (not found)")
                 continue
 
+            import time as _time
+            torch.cuda.reset_peak_memory_stats()
+            # Bracket the timer with cuda.synchronize() so perf_counter captures
+            # COMPLETED GPU work, not just kernel-launch time. (CUDA events aren't
+            # used here because process_sequence also runs CPU-side bundle
+            # adjustment — events would time only the GPU stream. Pure-GPU compute
+            # latency is reported separately via trtexec --noDataTransfers.)
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+            _t0 = _time.perf_counter()
             seq_rError, seq_tError = process_sequence(
                 model, seq_name, seq_data, category, args.co3d_dir,
                 args.min_num_images, args.num_frames, args.use_ba, device, dtype,
@@ -115,6 +166,14 @@ def run_evaluation_vggt(model, model_path=None, frames_chunk_size=None):
                 clear_cache=(frames_chunk_size >= 8),  # False on Jetson: empty_cache destroys activation pool
                 use_autocast=(frames_chunk_size >= 8),  # False on Jetson: autocast queries NVML → assert
             )
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+            _seq_s = _time.perf_counter() - _t0
+            _peak_alloc_mb = torch.cuda.max_memory_allocated() // (1024 ** 2)
+            _act_peak_mb = _peak_alloc_mb - weight_mem_mb
+            if seq_rError is not None:
+                logger.info(f"  time={_seq_s:.1f}s  peak_cuda={_peak_alloc_mb}MB  activations={_act_peak_mb}MB")
+                _seq_times.append(_seq_s)
 
             logger.info("-" * 50)
 
@@ -172,6 +231,69 @@ def run_evaluation_vggt(model, model_path=None, frames_chunk_size=None):
         mean_AUC_3 = np.mean([per_category_results[category]["Auc_3"] for category in per_category_results])
         logger.info("-"*50)
         logger.info(f"Mean AUC: {mean_AUC_30:.4f} (AUC@30), {mean_AUC_15:.4f} (AUC@15), {mean_AUC_5:.4f} (AUC@5), {mean_AUC_3:.4f} (AUC@3)")
+
+    total_s = __import__("time").perf_counter() - _eval_start
+    if _seq_times:
+        logger.info("="*50)
+        logger.info(f"Performance summary ({len(_seq_times)} sequences, after warmup):")
+        logger.info(f"  Model weights:    {weight_mem_mb} MB")
+        _p50, _p90, _p99 = (float(x) for x in np.percentile(_seq_times, [50, 90, 99]))
+        logger.info(f"  Per-sequence latency:  "
+                    f"mean={np.mean(_seq_times):.1f}s  "
+                    f"std={np.std(_seq_times):.1f}s  "
+                    f"min={np.min(_seq_times):.1f}s  "
+                    f"max={np.max(_seq_times):.1f}s")
+        logger.info(f"  Latency percentiles:   "
+                    f"p50={_p50:.1f}s  p90={_p90:.1f}s  p99={_p99:.1f}s")
+        logger.info(f"  Total wall time: {total_s/60:.1f} min")
+        logger.info(f"  Peak CUDA (last seq): allocated={torch.cuda.max_memory_allocated()//1024**2} MB  "
+                    f"reserved={torch.cuda.max_memory_reserved()//1024**2} MB")
+
+    # Save structured results to JSON for paper reporting.
+    if per_category_results:
+        _mean_30 = float(np.mean([v["Auc_30"] for v in per_category_results.values()]))
+        _mean_15 = float(np.mean([v["Auc_15"] for v in per_category_results.values()]))
+        _mean_5  = float(np.mean([v["Auc_5"]  for v in per_category_results.values()]))
+        _mean_3  = float(np.mean([v["Auc_3"]  for v in per_category_results.values()]))
+
+        results = {
+            "timestamp": datetime.datetime.now().isoformat(),
+            "model_path": model_path,
+            "num_frames": num_frames,
+            "weight_memory_mb": weight_mem_mb,
+            "peak_cuda_mb": torch.cuda.max_memory_allocated() // 1024**2,
+            "seq_latency_s": {
+                "mean": float(np.mean(_seq_times)) if _seq_times else None,
+                "std":  float(np.std(_seq_times))  if _seq_times else None,
+                "min":  float(np.min(_seq_times))  if _seq_times else None,
+                "max":  float(np.max(_seq_times))  if _seq_times else None,
+                "p50":  float(np.percentile(_seq_times, 50)) if _seq_times else None,
+                "p90":  float(np.percentile(_seq_times, 90)) if _seq_times else None,
+                "p99":  float(np.percentile(_seq_times, 99)) if _seq_times else None,
+                "n":    len(_seq_times),
+            },
+            "mean_auc": {
+                "auc30": _mean_30,
+                "auc15": _mean_15,
+                "auc5":  _mean_5,
+                "auc3":  _mean_3,
+            },
+            "per_category": {
+                cat: {
+                    "auc30": float(v["Auc_30"]),
+                    "auc15": float(v["Auc_15"]),
+                    "auc5":  float(v["Auc_5"]),
+                    "auc3":  float(v["Auc_3"]),
+                }
+                for cat, v in per_category_results.items()
+            },
+        }
+
+        out_path = results_path or "output/eval_results.json"
+        os.makedirs(os.path.dirname(out_path) if os.path.dirname(out_path) else ".", exist_ok=True)
+        with open(out_path, "w") as _f:
+            json.dump(results, _f, indent=2)
+        logger.info(f"Results saved to {out_path}")
     
 
 def run_test_vggt(args):

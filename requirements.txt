@@ -2,6 +2,8 @@
 torch == 2.7.1
 torchvision == 0.22.1
 onnx == 1.18.0
+polygraphy == 0.47.1        # TRT debugging: inspect graphs + numerical TRT↔ONNX parity
+onnxruntime == 1.18.0       # CPU golden reference for `polygraphy run --onnxrt`
 numpy >= 1.23, < 2.3.0
 pyyaml == 6.0.2
 tensorboard == 2.19.0
